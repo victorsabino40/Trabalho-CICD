@@ -1,25 +1,32 @@
+import com.sun.net.httpserver.Headers;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+
 import java.io.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.time.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
-public class Main {
-
-    static final class Ansi {
-        static final String RESET = "\u001B[0m";
-        static final String BOLD = "\u001B[1m";
-        static final String DIM = "\u001B[2m";
-        static final String RED = "\u001B[31m";
-        static final String GREEN = "\u001B[32m";
-        static final String YELLOW = "\u001B[33m";
-        static final String BLUE = "\u001B[34m";
-        static final String CYAN = "\u001B[36m";
-        static String color(String s, String c){ return c + s + RESET; }
-        static String bold(String s){ return BOLD + s + RESET; }
-        static String dim(String s){ return DIM + s + RESET; }
+public class EstoqueServer {
+    public static void main(String[] args) throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+        server.createContext("/api", new ApiHandler());
+        server.setExecutor(null);
+        Store.loadFromDisk();
+        Runtime.getRuntime().addShutdownHook(new Thread(Store::saveToDisk));
+        server.start();
+        System.out.println("http://localhost:8080");
     }
 
     static final class Produto {
@@ -30,100 +37,146 @@ public class Main {
         private final LocalDate dataEntrada;
         private LocalDateTime ultimaSaida;
 
-        private Produto(String id, String nome, BigDecimal preco, int quantidade, LocalDate dataEntrada, LocalDateTime ultimaSaida) {
+        Produto(String id, String nome, BigDecimal preco, int quantidade, LocalDate entrada, LocalDateTime ultimaSaida) {
             this.id = id;
-            this.nome = nome;
+            this.nome = nome.trim();
             this.preco = preco.setScale(2, RoundingMode.HALF_UP);
             this.quantidade = quantidade;
-            this.dataEntrada = dataEntrada;
+            this.dataEntrada = entrada;
             this.ultimaSaida = ultimaSaida;
         }
 
-        public static Produto novo(String nome, BigDecimal preco, int quantidade) {
-            return new Produto(UUID.randomUUID().toString(), nome.trim(), preco, quantidade, LocalDate.now(), null);
+        static Produto novo(String nome, BigDecimal preco, int quantidade) {
+            return new Produto(UUID.randomUUID().toString(), nome, preco, quantidade, LocalDate.now(), null);
         }
 
-        public String getId() { return id; }
-        public String getNome() { return nome; }
-        public void setNome(String nome) { this.nome = nome.trim(); }
-        public BigDecimal getPreco() { return preco; }
-        public void setPreco(BigDecimal preco) { this.preco = preco.setScale(2, RoundingMode.HALF_UP); }
-        public int getQuantidade() { return quantidade; }
-        public LocalDate getDataEntrada() { return dataEntrada; }
-        public LocalDateTime getUltimaSaida() { return ultimaSaida; }
-
-        public void vender(int qtd) {
-            if (qtd <= 0) throw new IllegalArgumentException("Quantidade deve ser positiva.");
-            if (qtd > quantidade) throw new IllegalArgumentException("Estoque insuficiente.");
-            quantidade -= qtd;
-            ultimaSaida = LocalDateTime.now();
-        }
+        String getId() { return id; }
+        String getNome() { return nome; }
+        BigDecimal getPreco() { return preco; }
+        int getQuantidade() { return quantidade; }
+        LocalDate getDataEntrada() { return dataEntrada; }
+        LocalDateTime getUltimaSaida() { return ultimaSaida; }
+        void setNome(String n) { this.nome = n.trim(); }
+        void setPreco(BigDecimal p) { this.preco = p.setScale(2, RoundingMode.HALF_UP); }
+        void setQuantidade(int q) { this.quantidade = q; }
+        void registrarSaidaAgora() { this.ultimaSaida = LocalDateTime.now(); }
     }
 
-    enum TipoMov { ENTRADA, SAIDA }
-
     static final class Movimentacao {
-        final String idProduto;
-        final String nomeProduto;
-        final TipoMov tipo;
-        final int quantidade;
-        final BigDecimal valorUnitario;
-        final LocalDateTime dataHora = LocalDateTime.now();
-        Movimentacao(String idProduto, String nomeProduto, TipoMov tipo, int quantidade, BigDecimal valorUnitario) {
+        enum Tipo { ENTRADA, SAIDA }
+        private LocalDateTime dataHora;
+        private final Tipo tipo;
+        private final String idProduto;
+        private final String nomeProduto;
+        private final int quantidade;
+        private final BigDecimal valorUnitario;
+
+        Movimentacao(Tipo tipo, String idProduto, String nomeProduto, int quantidade, BigDecimal valorUnitario) {
+            this.dataHora = LocalDateTime.now();
+            this.tipo = tipo;
             this.idProduto = idProduto;
             this.nomeProduto = nomeProduto;
-            this.tipo = tipo;
             this.quantidade = quantidade;
             this.valorUnitario = valorUnitario.setScale(2, RoundingMode.HALF_UP);
         }
+
+        LocalDateTime getDataHora() { return dataHora; }
+        String getTipo() { return tipo.name(); }
+        String getIdProduto() { return idProduto; }
+        String getNomeProduto() { return nomeProduto; }
+        int getQuantidade() { return quantidade; }
+        BigDecimal getValorUnitario() { return valorUnitario; }
+        void setDataHora(LocalDateTime t) { this.dataHora = t; }
     }
 
-    static final class RepoCsv {
-        private static final Path PROD_CSV = Paths.get("estoque.csv");
-        private static final Path MOV_CSV  = Paths.get("movimentacoes.csv");
+    static final class Store {
+        private static final Map<String, Produto> PRODUTOS = new ConcurrentHashMap<>();
+        private static final List<Movimentacao> MOVS = new CopyOnWriteArrayList<>();
+        private static volatile int LIMITE_BAIXA = 5;
+        private static final Path PROD = Paths.get("estoque.csv");
+        private static final Path MOV = Paths.get("movimentacoes.csv");
         private static final DateTimeFormatter D = DateTimeFormatter.ISO_LOCAL_DATE;
         private static final DateTimeFormatter DT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
-        static void salvar(Collection<Produto> produtos, List<Movimentacao> historico) {
-            try {
-                try (BufferedWriter w = Files.newBufferedWriter(PROD_CSV)) {
-                    w.write("id;nome;preco;quantidade;dataEntrada;ultimaSaida\n");
-                    for (var p : produtos) {
-                        w.write(String.join(";",
-                                esc(p.getId()),
-                                esc(p.getNome()),
-                                p.getPreco().toPlainString(),
-                                Integer.toString(p.getQuantidade()),
-                                p.getDataEntrada().format(D),
-                                p.getUltimaSaida() != null ? p.getUltimaSaida().format(DT) : ""
-                        ));
-                        w.write("\n");
-                    }
-                }
-                try (BufferedWriter w = Files.newBufferedWriter(MOV_CSV)) {
-                    w.write("idProduto;nomeProduto;tipo;quantidade;valorUnit;dataHora\n");
-                    for (var m : historico) {
-                        w.write(String.join(";",
-                                esc(m.idProduto),
-                                esc(m.nomeProduto),
-                                m.tipo.name(),
-                                Integer.toString(m.quantidade),
-                                m.valorUnitario.toPlainString(),
-                                m.dataHora.format(DT)
-                        ));
-                        w.write("\n");
-                    }
-                }
-            } catch (IOException e) {
-                System.out.println(Ansi.color("Falha ao salvar CSV: " + e.getMessage(), Ansi.RED));
-            }
+        static Collection<Produto> produtos() { return PRODUTOS.values(); }
+        static Optional<Produto> get(String id) { return Optional.ofNullable(PRODUTOS.get(id)); }
+        static List<Movimentacao> historico() { return MOVS; }
+        static int getLimiteBaixa() { return LIMITE_BAIXA; }
+        static void setLimiteBaixa(int v) { LIMITE_BAIXA = Math.max(0, v); }
+
+        static Produto cadastrar(String nome, BigDecimal preco, int quantidade) {
+            if (nome == null || nome.isBlank()) throw new IllegalArgumentException("nome inválido");
+            if (preco == null || preco.signum() < 0) throw new IllegalArgumentException("preço inválido");
+            if (quantidade < 0) throw new IllegalArgumentException("quantidade inválida");
+            var p = Produto.novo(nome, preco, quantidade);
+            PRODUTOS.put(p.getId(), p);
+            MOVS.add(new Movimentacao(Movimentacao.Tipo.ENTRADA, p.getId(), p.getNome(), quantidade, p.getPreco()));
+            return p;
         }
 
-        static LoadResult carregar() {
-            Map<String, Produto> mapa = new LinkedHashMap<>();
-            List<Movimentacao> movs = new ArrayList<>();
-            if (Files.exists(PROD_CSV)) {
-                try (BufferedReader r = Files.newBufferedReader(PROD_CSV)) {
+        static Produto vender(String id, int quantidade) {
+            var p = get(id).orElseThrow(() -> new NoSuchElementException("produto não encontrado"));
+            if (quantidade <= 0) throw new IllegalArgumentException("quantidade deve ser positiva");
+            if (quantidade > p.getQuantidade()) throw new IllegalArgumentException("estoque insuficiente");
+            p.setQuantidade(p.getQuantidade() - quantidade);
+            p.registrarSaidaAgora();
+            MOVS.add(new Movimentacao(Movimentacao.Tipo.SAIDA, p.getId(), p.getNome(), quantidade, p.getPreco()));
+            return p;
+        }
+
+        static Produto alterarPreco(String id, BigDecimal novo) {
+            var p = get(id).orElseThrow(() -> new NoSuchElementException("produto não encontrado"));
+            if (novo == null || novo.signum() < 0) throw new IllegalArgumentException("preço inválido");
+            p.setPreco(novo);
+            return p;
+        }
+
+        static Produto renomear(String id, String novo) {
+            var p = get(id).orElseThrow(() -> new NoSuchElementException("produto não encontrado"));
+            if (novo == null || novo.isBlank()) throw new IllegalArgumentException("nome inválido");
+            p.setNome(novo);
+            return p;
+        }
+
+        static Produto ajustarQuantidade(String id, int novaQuantidade) {
+            var p = get(id).orElseThrow(() -> new NoSuchElementException("produto não encontrado"));
+            if (novaQuantidade < 0) throw new IllegalArgumentException("quantidade inválida");
+            int delta = novaQuantidade - p.getQuantidade();
+            p.setQuantidade(novaQuantidade);
+            if (delta > 0) MOVS.add(new Movimentacao(Movimentacao.Tipo.ENTRADA, p.getId(), p.getNome(), delta, p.getPreco()));
+            return p;
+        }
+
+        static void remover(String id) {
+            var p = PRODUTOS.remove(id);
+            if (p == null) throw new NoSuchElementException("produto não encontrado");
+        }
+
+        static void saveToDisk() {
+            try {
+                try (BufferedWriter w = Files.newBufferedWriter(PROD, StandardCharsets.UTF_8)) {
+                    w.write("id;nome;preco;quantidade;dataEntrada;ultimaSaida\n");
+                    for (var p : produtos()) {
+                        String saida = p.getUltimaSaida() != null ? p.getUltimaSaida().format(DT) : "";
+                        w.write(String.join(";", esc(p.getId()), esc(p.getNome()), p.getPreco().toPlainString(),
+                                Integer.toString(p.getQuantidade()), p.getDataEntrada().format(D), saida));
+                        w.write("\n");
+                    }
+                }
+                try (BufferedWriter w = Files.newBufferedWriter(MOV, StandardCharsets.UTF_8)) {
+                    w.write("dataHora;tipo;idProduto;nomeProduto;quantidade;valorUnitario\n");
+                    for (var m : historico()) {
+                        w.write(String.join(";", m.getDataHora().format(DT), m.getTipo(), esc(m.getIdProduto()), esc(m.getNomeProduto()),
+                                Integer.toString(m.getQuantidade()), m.getValorUnitario().toPlainString()));
+                        w.write("\n");
+                    }
+                }
+            } catch (IOException ignored) {}
+        }
+
+        static void loadFromDisk() {
+            if (Files.exists(PROD)) {
+                try (BufferedReader r = Files.newBufferedReader(PROD, StandardCharsets.UTF_8)) {
                     String line = r.readLine();
                     while ((line = r.readLine()) != null) {
                         var cols = parse(line);
@@ -132,45 +185,32 @@ public class Main {
                         BigDecimal preco = new BigDecimal(cols.get(2));
                         int qtd = Integer.parseInt(cols.get(3));
                         LocalDate entrada = LocalDate.parse(cols.get(4), D);
-                        LocalDateTime saida = cols.size() > 5 && !cols.get(5).isBlank()
-                                ? LocalDateTime.parse(cols.get(5), DT) : null;
-                        Produto p = new Produto(id, nome, preco, qtd, entrada, saida);
-                        mapa.put(id, p);
+                        LocalDateTime saida = cols.size() > 5 && !cols.get(5).isBlank() ? LocalDateTime.parse(cols.get(5), DT) : null;
+                        PRODUTOS.put(id, new Produto(id, nome, preco, qtd, entrada, saida));
                     }
-                } catch (Exception e) {
-                    System.out.println(Ansi.color("Falha ao carregar estoque.csv: " + e.getMessage(), Ansi.RED));
-                }
+                } catch (Exception ignored) {}
             }
-            if (Files.exists(MOV_CSV)) {
-                try (BufferedReader r = Files.newBufferedReader(MOV_CSV)) {
+            if (Files.exists(MOV)) {
+                try (BufferedReader r = Files.newBufferedReader(MOV, StandardCharsets.UTF_8)) {
                     String line = r.readLine();
                     while ((line = r.readLine()) != null) {
                         var cols = parse(line);
-                        Movimentacao m = new Movimentacao(
-                                unesc(cols.get(0)),
-                                unesc(cols.get(1)),
-                                TipoMov.valueOf(cols.get(2)),
-                                Integer.parseInt(cols.get(3)),
-                                new BigDecimal(cols.get(4))
-                        );
-                        movs.add(m);
+                        LocalDateTime dh = LocalDateTime.parse(cols.get(0), DT);
+                        Movimentacao.Tipo tipo = Movimentacao.Tipo.valueOf(cols.get(1));
+                        String idp = unesc(cols.get(2));
+                        String nomep = unesc(cols.get(3));
+                        int qtd = Integer.parseInt(cols.get(4));
+                        BigDecimal val = new BigDecimal(cols.get(5));
+                        Movimentacao m = new Movimentacao(tipo, idp, nomep, qtd, val);
+                        m.setDataHora(dh);
+                        MOVS.add(m);
                     }
-                } catch (Exception e) {
-                    System.out.println(Ansi.color("Falha ao carregar movimentacoes.csv: " + e.getMessage(), Ansi.RED));
-                }
+                } catch (Exception ignored) {}
             }
-            return new LoadResult(mapa, movs);
         }
 
-        record LoadResult(Map<String, Produto> produtos, List<Movimentacao> historico) {}
-
-        private static String esc(String s) {
-            if (s == null) return "";
-            return s.replace("\\","\\\\").replace(";","\\;").replace("\n","\\n");
-        }
-        private static String unesc(String s) {
-            return s.replace("\\n","\n").replace("\\;",";").replace("\\\\","\\");
-        }
+        private static String esc(String s) { return s.replace("\\","\\\\").replace(";","\\;").replace("\n","\\n"); }
+        private static String unesc(String s) { return s.replace("\\n","\n").replace("\\;",";").replace("\\\\","\\"); }
         private static List<String> parse(String line) {
             List<String> out = new ArrayList<>();
             StringBuilder sb = new StringBuilder();
@@ -186,274 +226,305 @@ public class Main {
         }
     }
 
-    static final class Estoque {
-        private final Map<String, Produto> produtos = new LinkedHashMap<>();
-        private final List<Movimentacao> historico = new ArrayList<>();
-        private int limiteBaixaQtd = 5;
-
-        public void setLimiteBaixaQtd(int limite) {
-            if (limite < 0) throw new IllegalArgumentException("Limite inválido.");
-            this.limiteBaixaQtd = limite;
-        }
-
-        public void putLoaded(Produto p){ produtos.put(p.getId(), p); }
-
-        public Produto cadastrar(String nome, BigDecimal preco, int quantidade) {
-            if (nome == null || nome.isBlank()) throw new IllegalArgumentException("Nome obrigatório.");
-            if (preco == null || preco.signum() < 0) throw new IllegalArgumentException("Preço inválido.");
-            if (quantidade < 0) throw new IllegalArgumentException("Quantidade inválida.");
-            Produto p = Produto.novo(nome, preco, quantidade);
-            produtos.put(p.getId(), p);
-            historico.add(new Movimentacao(p.getId(), p.getNome(), TipoMov.ENTRADA, quantidade, preco));
-            checarBaixa(p, true);
-            return p;
-        }
-
-        public void vender(String idProduto, int qtd) {
-            Produto p = produtos.get(idProduto);
-            if (p == null) throw new IllegalArgumentException("Produto não encontrado.");
-            p.vender(qtd);
-            historico.add(new Movimentacao(p.getId(), p.getNome(), TipoMov.SAIDA, qtd, p.getPreco()));
-            checarBaixa(p, false);
-        }
-
-        public void alterarPreco(String idProduto, BigDecimal novo) {
-            Produto p = produtos.get(idProduto);
-            if (p == null) throw new IllegalArgumentException("Produto não encontrado.");
-            if (novo.signum() < 0) throw new IllegalArgumentException("Preço inválido.");
-            p.setPreco(novo);
-        }
-
-        public Collection<Produto> todos() { return produtos.values(); }
-        public List<Movimentacao> historico() { return historico; }
-        public Optional<Produto> buscarPorId(String id){ return Optional.ofNullable(produtos.get(id)); }
-
-        public List<Produto> buscarPorNome(String termo){
-            String t = termo.toLowerCase(Locale.ROOT);
-            return produtos.values().stream()
-                    .filter(p -> p.getNome().toLowerCase(Locale.ROOT).contains(t))
-                    .toList();
-        }
-
-        private void checarBaixa(Produto p, boolean silencioso) {
-            if (p.getQuantidade() <= limiteBaixaQtd) {
-                String msg = "Estoque baixo para \"" + p.getNome() + "\" (qtd " + p.getQuantidade() + " ≤ limite " + limiteBaixaQtd + ")";
-                if (!silencioso) System.out.println(Ansi.color("⚠ " + msg, Ansi.YELLOW));
-            }
-        }
-    }
-
-    private static final Scanner in = new Scanner(System.in);
-
-    public static void main(String[] args) {
-        var load = RepoCsv.carregar();
-        Estoque estoque = new Estoque();
-        load.produtos().values().forEach(estoque::putLoaded);
-        estoque.historico().addAll(load.historico());
-        header();
-        loop(estoque);
-        RepoCsv.salvar(estoque.todos(), estoque.historico());
-        System.out.println(Ansi.color("Dados salvos em estoque.csv e movimentacoes.csv. Até logo!", Ansi.CYAN));
-    }
-
-    private static void header() {
-        System.out.println(Ansi.bold("╔════════════════════════════════════════════╗"));
-        System.out.println(Ansi.bold("║        CONTROLE DE ESTOQUE (Console)       ║"));
-        System.out.println(Ansi.bold("╚════════════════════════════════════════════╝"));
-        System.out.println(Ansi.dim("Java 17+ • BigDecimal • CSV • ANSI UI\n"));
-    }
-
-    private static void loop(Estoque estoque) {
-        boolean run = true;
-        while (run) {
-            System.out.println(Ansi.bold("""
-                [1] Cadastrar produto
-                [2] Vender produto
-                [3] Alterar preço
-                [4] Listar produtos
-                [5] Buscar por nome
-                [6] Ordenar listagem
-                [7] Histórico de movimentações
-                [8] Ajustar limite de baixa
-                [0] Sair
-                """));
-            System.out.print(Ansi.color("Escolha: ", Ansi.BLUE));
-            String op = in.nextLine().trim();
+    static final class ApiHandler implements HttpHandler {
+        public void handle(HttpExchange ex) throws IOException {
             try {
-                switch (op) {
-                    case "1" -> cadastrarUI(estoque);
-                    case "2" -> venderUI(estoque);
-                    case "3" -> alterarPrecoUI(estoque);
-                    case "4" -> listarUI(estoque, List.of(), "nome");
-                    case "5" -> buscarUI(estoque);
-                    case "6" -> ordenarUI(estoque);
-                    case "7" -> historicoUI(estoque);
-                    case "8" -> ajustarLimiteUI(estoque);
-                    case "0" -> run = false;
-                    default -> System.out.println(Ansi.color("Opção inválida.", Ansi.RED));
-                }
+                addCors(ex);
+                if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) { send(ex, 204, ""); return; }
+                URI uri = ex.getRequestURI();
+                String path = uri.getPath();
+                String method = ex.getRequestMethod().toUpperCase(Locale.ROOT);
+                if (path.equals("/api") || path.equals("/api/")) { send(ex, 200, json(Map.of("status","ok"))); return; }
+                if (path.startsWith("/api/produtos")) { handleProdutos(ex, method, path, uri.getQuery()); return; }
+                if (path.startsWith("/api/movimentacoes")) { handleMovs(ex, method); return; }
+                if (path.startsWith("/api/config/limite-baixa")) { handleLimite(ex, method, path); return; }
+                send(ex, 404, json(Map.of("erro","rota não encontrada")));
             } catch (Exception e) {
-                System.out.println(Ansi.color("Erro: " + e.getMessage(), Ansi.RED));
+                send(ex, 500, json(Map.of("erro", e.getMessage())));
+            } finally {
+                ex.close();
             }
-            System.out.println();
         }
-    }
 
-    private static void cadastrarUI(Estoque e) {
-        System.out.print("Nome: ");
-        String nome = in.nextLine().trim();
-        BigDecimal preco = lerBig("Preço (R$): ");
-        int qtd = lerInt("Quantidade: ");
-        Produto p = e.cadastrar(nome, preco, qtd);
-        System.out.println(Ansi.color("✔ Produto cadastrado: " + p.getNome() +
-                " (ID " + p.getId().substring(0,8) + ") em " + p.getDataEntrada(), Ansi.GREEN));
-    }
-
-    private static void venderUI(Estoque e) {
-        var prod = selecionarProduto(e);
-        int qtd = lerInt("Quantidade a vender: ");
-        confirma("Confirmar venda de %d un de \"%s\"?".formatted(qtd, prod.getNome()));
-        e.vender(prod.getId(), qtd);
-        System.out.println(Ansi.color("✔ Venda registrada. Quantidade atual: " + prod.getQuantidade() +
-                " • Última saída: " + (prod.getUltimaSaida() + "").replace('T',' '), Ansi.GREEN));
-    }
-
-    private static void alterarPrecoUI(Estoque e) {
-        var prod = selecionarProduto(e);
-        BigDecimal novo = lerBig("Novo preço (R$): ");
-        e.alterarPreco(prod.getId(), novo);
-        System.out.println(Ansi.color("✔ Preço atualizado para R$ " + prod.getPreco(), Ansi.GREEN));
-    }
-
-    private static void listarUI(Estoque e, List<Produto> base, String ordenarPor) {
-        List<Produto> lista = base.isEmpty() ? new ArrayList<>(e.todos()) : new ArrayList<>(base);
-        Comparator<Produto> comp = switch (ordenarPor) {
-            case "preco" -> Comparator.comparing(Produto::getPreco);
-            case "quantidade" -> Comparator.comparingInt(Produto::getQuantidade);
-            case "entrada" -> Comparator.comparing(Produto::getDataEntrada);
-            default -> Comparator.comparing(Produto::getNome, String.CASE_INSENSITIVE_ORDER);
-        };
-        lista.sort(comp);
-        if (lista.isEmpty()) { System.out.println(Ansi.dim("Nenhum produto.")); return; }
-        String[] header = {"ID", "Produto", "Preço", "Qtd", "Entrada", "Última saída"};
-        int[] widths = {8, 22, 10, 5, 12, 19};
-        printRow(header, widths, true);
-        for (var p : lista) {
-            String lowFlag = p.getQuantidade() <= 5 ? Ansi.color("↓", Ansi.YELLOW) : "";
-            String[] row = {
-                    p.getId().substring(0, 8),
-                    p.getNome(),
-                    "R$ " + p.getPreco(),
-                    (p.getQuantidade() + " " + lowFlag).trim(),
-                    p.getDataEntrada().toString(),
-                    p.getUltimaSaida() != null ? p.getUltimaSaida().toString().replace('T',' ') : "-"
-            };
-            printRow(row, widths, false);
+        void handleProdutos(HttpExchange ex, String method, String path, String query) throws IOException {
+            if (path.equals("/api/produtos") && method.equals("GET")) {
+                Map<String,String> q = parseQuery(query);
+                String buscar = q.getOrDefault("buscar", null);
+                String ordenar = q.getOrDefault("ordenarPor", "nome");
+                var stream = Store.produtos().stream();
+                if (buscar != null && !buscar.isBlank()) {
+                    String t = buscar.toLowerCase(Locale.ROOT);
+                    stream = stream.filter(p -> p.getNome().toLowerCase(Locale.ROOT).contains(t));
+                }
+                Comparator<Produto> comp = switch (ordenar) {
+                    case "preco" -> Comparator.comparing(Produto::getPreco);
+                    case "quantidade" -> Comparator.comparingInt(Produto::getQuantidade);
+                    case "entrada" -> Comparator.comparing(Produto::getDataEntrada);
+                    default -> Comparator.comparing(p -> p.getNome().toLowerCase(Locale.ROOT));
+                };
+                List<Map<String,Object>> resp = new ArrayList<>();
+                stream.sorted(comp).forEach(p -> resp.add(prodToMap(p)));
+                send(ex, 200, json(resp));
+                return;
+            }
+            if (path.equals("/api/produtos") && method.equals("POST")) {
+                String body = readBody(ex);
+                String nome = jString(body, "nome");
+                BigDecimal preco = jDecimal(body, "preco");
+                Integer quantidade = jInt(body, "quantidade");
+                var p = Store.cadastrar(nome, preco, quantidade);
+                Store.saveToDisk();
+                send(ex, 200, json(prodToMap(p)));
+                return;
+            }
+            String[] parts = path.split("/");
+            if (parts.length >= 4) {
+                String id = parts[3];
+                if (parts.length == 4) {
+                    if (method.equals("GET")) {
+                        var p = Store.get(id).orElse(null);
+                        if (p == null) { send(ex, 404, json(Map.of("erro","não encontrado"))); return; }
+                        send(ex, 200, json(prodToMap(p)));
+                        return;
+                    }
+                    if (method.equals("DELETE")) {
+                        Store.remover(id);
+                        Store.saveToDisk();
+                        send(ex, 204, "");
+                        return;
+                    }
+                }
+                if (parts.length == 5) {
+                    String action = parts[4];
+                    if (action.equals("vendas") && method.equals("POST")) {
+                        String body = readBody(ex);
+                        Integer quantidade = jInt(body, "quantidade");
+                        var p = Store.vender(id, quantidade);
+                        Store.saveToDisk();
+                        send(ex, 200, json(prodToMap(p)));
+                        return;
+                    }
+                    if (action.equals("preco") && (method.equals("PATCH") || method.equals("POST") || method.equals("PUT"))) {
+                        String body = readBody(ex);
+                        BigDecimal novo = jDecimal(body, "novoPreco");
+                        var p = Store.alterarPreco(id, novo);
+                        Store.saveToDisk();
+                        send(ex, 200, json(prodToMap(p)));
+                        return;
+                    }
+                    if (action.equals("renomear") && (method.equals("PATCH") || method.equals("POST") || method.equals("PUT"))) {
+                        String body = readBody(ex);
+                        String novo = jString(body, "novoNome");
+                        var p = Store.renomear(id, novo);
+                        Store.saveToDisk();
+                        send(ex, 200, json(prodToMap(p)));
+                        return;
+                    }
+                    if (action.equals("quantidade") && (method.equals("PATCH") || method.equals("POST") || method.equals("PUT"))) {
+                        String body = readBody(ex);
+                        Integer novaQuantidade = jInt(body, "novaQuantidade");
+                        var p = Store.ajustarQuantidade(id, novaQuantidade);
+                        Store.saveToDisk();
+                        send(ex, 200, json(prodToMap(p)));
+                        return;
+                    }
+                }
+            }
+            send(ex, 404, json(Map.of("erro","rota de produtos inválida")));
         }
-    }
 
-    private static void buscarUI(Estoque e) {
-        System.out.print("Buscar por nome (termo): ");
-        String termo = in.nextLine().trim();
-        var res = e.buscarPorNome(termo);
-        if (res.isEmpty()) System.out.println(Ansi.color("Nenhum produto corresponde ao termo.", Ansi.YELLOW));
-        else listarUI(e, res, "nome");
-    }
-
-    private static void ordenarUI(Estoque e) {
-        System.out.print("Ordenar por [nome|preco|quantidade|entrada]: ");
-        String o = in.nextLine().trim().toLowerCase(Locale.ROOT);
-        if (!Set.of("nome","preco","quantidade","entrada").contains(o)) {
-            System.out.println(Ansi.color("Opção inválida.", Ansi.RED)); return;
+        void handleMovs(HttpExchange ex, String method) throws IOException {
+            if (!method.equals("GET")) { send(ex, 405, json(Map.of("erro","método não permitido"))); return; }
+            List<Map<String,Object>> out = new ArrayList<>();
+            for (var m : Store.historico()) {
+                Map<String,Object> mm = new LinkedHashMap<>();
+                mm.put("dataHora", m.getDataHora().toString());
+                mm.put("tipo", m.getTipo());
+                mm.put("idProduto", m.getIdProduto());
+                mm.put("nomeProduto", m.getNomeProduto());
+                mm.put("quantidade", m.getQuantidade());
+                mm.put("valorUnitario", m.getValorUnitario());
+                out.add(mm);
+            }
+            send(ex, 200, json(out));
         }
-        listarUI(e, List.of(), o);
-    }
 
-    private static void historicoUI(Estoque e) {
-        if (e.historico().isEmpty()) { System.out.println(Ansi.dim("Sem movimentações.")); return; }
-        String[] h = {"Data/Hora", "Tipo", "Produto", "Qtd", "Preço"};
-        int[] w = {19, 8, 24, 5, 10};
-        printRow(h, w, true);
-        for (var m : e.historico()) {
-            String tipo = m.tipo == TipoMov.ENTRADA ? Ansi.color("ENTRADA", Ansi.CYAN) : Ansi.color("SAÍDA", Ansi.BLUE);
-            String[] row = {
-                    m.dataHora.toString().replace('T',' '),
-                    tipo,
-                    m.nomeProduto,
-                    Integer.toString(m.quantidade),
-                    "R$ " + m.valorUnitario
-            };
-            printRow(row, w, false);
+        void handleLimite(HttpExchange ex, String method, String path) throws IOException {
+            if (method.equals("GET")) {
+                send(ex, 200, json(Map.of("limiteBaixa", Store.getLimiteBaixa())));
+                return;
+            }
+            if (method.equals("PUT")) {
+                String[] parts = path.split("/");
+                if (parts.length >= 5) {
+                    try {
+                        int v = Integer.parseInt(parts[4]);
+                        Store.setLimiteBaixa(v);
+                        Store.saveToDisk();
+                        send(ex, 200, json(Map.of("limiteBaixa", Store.getLimiteBaixa())));
+                        return;
+                    } catch (NumberFormatException e) {
+                        send(ex, 400, json(Map.of("erro","valor inválido")));
+                        return;
+                    }
+                }
+            }
+            send(ex, 405, json(Map.of("erro","não suportado")));
         }
-        BigDecimal totalSaidas = e.historico().stream()
-                .filter(m -> m.tipo == TipoMov.SAIDA)
-                .map(m -> m.valorUnitario.multiply(BigDecimal.valueOf(m.quantidade)))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        System.out.println(Ansi.bold("Total em vendas registradas: ") + Ansi.color("R$ " + totalSaidas.setScale(2, RoundingMode.HALF_UP), Ansi.GREEN));
-    }
 
-    private static void ajustarLimiteUI(Estoque e) {
-        int novo = lerInt("Novo limite de baixa quantidade: ");
-        e.setLimiteBaixaQtd(novo);
-        System.out.println(Ansi.color("✔ Limite atualizado para " + novo, Ansi.GREEN));
-    }
-
-    private static Produto selecionarProduto(Estoque e) {
-        if (e.todos().isEmpty()) throw new IllegalStateException("Não há produtos.");
-        List<Produto> list = new ArrayList<>(e.todos());
-        for (int i = 0; i < list.size(); i++) {
-            Produto p = list.get(i);
-            System.out.printf("%s%2d)%s %s (ID %s) - qtd %d, R$ %s%n",
-                    Ansi.BOLD, i+1, Ansi.RESET, p.getNome(), p.getId().substring(0,8), p.getQuantidade(), p.getPreco());
+        Map<String,String> parseQuery(String q) {
+            Map<String,String> map = new HashMap<>();
+            if (q == null || q.isBlank()) return map;
+            for (String part : q.split("&")) {
+                int i = part.indexOf('=');
+                if (i > 0) {
+                    String k = URLDecoder.decode(part.substring(0,i), StandardCharsets.UTF_8);
+                    String v = URLDecoder.decode(part.substring(i+1), StandardCharsets.UTF_8);
+                    map.put(k, v);
+                } else {
+                    map.put(URLDecoder.decode(part, StandardCharsets.UTF_8), "");
+                }
+            }
+            return map;
         }
-        int idx = lerInt("Selecione o nº do produto: ") - 1;
-        if (idx < 0 || idx >= list.size()) throw new IllegalArgumentException("Seleção inválida.");
-        return list.get(idx);
-    }
 
-    private static BigDecimal lerBig(String prompt) {
-        while (true) {
-            System.out.print(prompt);
-            var s = in.nextLine().trim().replace(",", ".");
-            try { return new BigDecimal(s).setScale(2, RoundingMode.HALF_UP); }
-            catch (Exception ex) { System.out.println(Ansi.color("Valor inválido.", Ansi.RED)); }
+        Map<String,Object> prodToMap(Produto p) {
+            Map<String,Object> m = new LinkedHashMap<>();
+            m.put("id", p.getId());
+            m.put("nome", p.getNome());
+            m.put("preco", p.getPreco());
+            m.put("quantidade", p.getQuantidade());
+            m.put("dataEntrada", p.getDataEntrada().toString());
+            m.put("ultimaSaida", p.getUltimaSaida() != null ? p.getUltimaSaida().toString() : null);
+            m.put("estoqueBaixo", p.getQuantidade() <= Store.getLimiteBaixa());
+            return m;
         }
-    }
 
-    private static int lerInt(String prompt) {
-        while (true) {
-            System.out.print(prompt);
-            var s = in.nextLine().trim();
-            try { return Integer.parseInt(s); }
-            catch (Exception ex) { System.out.println(Ansi.color("Digite um inteiro.", Ansi.RED)); }
+        void addCors(HttpExchange ex) {
+            Headers h = ex.getResponseHeaders();
+            h.add("Access-Control-Allow-Origin", "*");
+            h.add("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+            h.add("Access-Control-Allow-Headers", "Content-Type");
+            h.add("Content-Type", "application/json; charset=utf-8");
         }
-    }
 
-    private static void confirma(String msg){
-        System.out.print(Ansi.color(msg + " [s/N]: ", Ansi.YELLOW));
-        String s = in.nextLine().trim().toLowerCase(Locale.ROOT);
-        if (!s.equals("s") && !s.equals("sim")) throw new RuntimeException("Operação cancelada.");
-    }
-
-    private static void printRow(String[] cols, int[] widths, boolean header){
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < cols.length; i++) {
-            String c = cols[i];
-            int w = widths[i];
-            sb.append(pad(c, w)).append("  ");
+        String readBody(HttpExchange ex) throws IOException {
+            try (InputStream is = ex.getRequestBody()) {
+                return new String(is.readAllBytes(), StandardCharsets.UTF_8).trim();
+            }
         }
-        String line = sb.toString();
-        if (header) {
-            System.out.println(Ansi.bold(line));
-            System.out.println(Ansi.dim("-".repeat(Math.min(100, line.length()))));
-        } else {
-            System.out.println(line);
-        }
-    }
 
-    private static String pad(String s, int w){
-        if (s.length() > w) return s.substring(0, Math.max(0,w-1)) + "…";
-        return s + " ".repeat(Math.max(0, w - s.length()));
+        void send(HttpExchange ex, int status, String body) throws IOException {
+            byte[] b = body.getBytes(StandardCharsets.UTF_8);
+            ex.sendResponseHeaders(status, b.length);
+            try (OutputStream os = ex.getResponseBody()) { os.write(b); }
+        }
+
+        String jString(String body, String key) {
+            String v = jRaw(body, key);
+            if (v == null) throw new IllegalArgumentException("campo \""+key+"\" obrigatório");
+            if (v.startsWith("\"") && v.endsWith("\"")) v = unescapeJson(v.substring(1, v.length()-1));
+            return v;
+        }
+
+        Integer jInt(String body, String key) {
+            String v = jRaw(body, key);
+            if (v == null) throw new IllegalArgumentException("campo \""+key+"\" obrigatório");
+            try { return Integer.parseInt(v.replaceAll("[^0-9\\-]", "")); } catch (Exception e) { throw new IllegalArgumentException("campo \""+key+"\" inválido"); }
+        }
+
+        BigDecimal jDecimal(String body, String key) {
+            String v = jRaw(body, key);
+            if (v == null) throw new IllegalArgumentException("campo \""+key+"\" obrigatório");
+            try { return new BigDecimal(v.replace(",", ".").replaceAll("[^0-9\\.-]", "")); } catch (Exception e) { throw new IllegalArgumentException("campo \""+key+"\" inválido"); }
+        }
+
+        String jRaw(String body, String key) {
+            if (body == null) return null;
+            String k = "\"" + key + "\"";
+            int i = body.indexOf(k);
+            if (i < 0) return null;
+            int colon = body.indexOf(':', i + k.length());
+            if (colon < 0) return null;
+            int pos = colon + 1;
+            while (pos < body.length() && Character.isWhitespace(body.charAt(pos))) pos++;
+            if (pos >= body.length()) return null;
+            char c = body.charAt(pos);
+            if (c == '"') {
+                StringBuilder sb = new StringBuilder();
+                pos++;
+                boolean esc = false;
+                while (pos < body.length()) {
+                    char ch = body.charAt(pos++);
+                    if (esc) { sb.append(ch); esc = false; continue; }
+                    if (ch == '\\') { esc = true; continue; }
+                    if (ch == '"') break;
+                    sb.append(ch);
+                }
+                return "\"" + sb.toString() + "\"";
+            } else {
+                StringBuilder sb = new StringBuilder();
+                while (pos < body.length()) {
+                    char ch = body.charAt(pos);
+                    if (ch == ',' || ch == '}' || ch == '\n' || ch == '\r') break;
+                    sb.append(ch);
+                    pos++;
+                }
+                return sb.toString().trim();
+            }
+        }
+
+        String unescapeJson(String s) {
+            StringBuilder sb = new StringBuilder();
+            boolean esc = false;
+            for (int i=0;i<s.length();i++) {
+                char ch = s.charAt(i);
+                if (esc) {
+                    if (ch=='n') sb.append('\n');
+                    else if (ch=='r') sb.append('\r');
+                    else if (ch=='t') sb.append('\t');
+                    else sb.append(ch);
+                    esc = false;
+                } else if (ch=='\\') {
+                    esc = true;
+                } else {
+                    sb.append(ch);
+                }
+            }
+            return sb.toString();
+        }
+
+        String json(Object o) {
+            if (o == null) return "null";
+            if (o instanceof String s) return "\"" + s.replace("\\","\\\\").replace("\"","\\\"").replace("\n","\\n") + "\"";
+            if (o instanceof Number || o instanceof Boolean) return o.toString();
+            if (o instanceof BigDecimal bd) return bd.stripTrailingZeros().toPlainString();
+            if (o instanceof LocalDate d) return json(d.toString());
+            if (o instanceof LocalDateTime dt) return json(dt.toString());
+            if (o instanceof Map<?,?> m) {
+                StringBuilder sb = new StringBuilder("{");
+                boolean first = true;
+                for (var e : m.entrySet()) {
+                    if (!first) sb.append(",");
+                    first = false;
+                    sb.append(json(e.getKey().toString())).append(":").append(json(e.getValue()));
+                    }
+                sb.append("}");
+                return sb.toString();
+            }
+            if (o instanceof Collection<?> c) {
+                StringBuilder sb = new StringBuilder("[");
+                boolean first = true;
+                for (var e : c) {
+                    if (!first) sb.append(",");
+                    first = false;
+                    sb.append(json(e));
+                }
+                sb.append("]");
+                return sb.toString();
+            }
+            return json(o.toString());
+        }
     }
 }
 
