@@ -1,0 +1,33 @@
+groups:
+- name: estoque-alerts
+  interval: 30s
+  rules:
+  - alert: EstoqueApiHighErrorRate
+    expr: |
+      (sum(rate(estoque_http_requests_total{status=~"5..|4.."}[5m])))
+        / ignoring(status) group_left
+      (sum(rate(estoque_http_requests_total[5m]))) > 0.02
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Taxa de erro alta (>2%)"
+      description: "Erro > 2% nas últimas 5m. Verifique logs e saúde da aplicação."
+  - alert: EstoqueApiHighLatencyP95
+    expr: |
+      histogram_quantile(0.95, sum by (le) (rate(estoque_http_request_seconds_bucket[5m])))
+        > 0.5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Latência p95 alta (>500ms)"
+      description: "p95 > 500ms nas últimas 5m."
+  - alert: EstoqueApiInstanceDown
+    expr: up{job="estoque-api"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Instância da API fora do ar"
+      description: "Target scrape de estoque-api está DOWN há 1m."
