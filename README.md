@@ -1,155 +1,48 @@
-# 📦 API de Controle de Estoque
+# Frontend – Controle de Estoque
+Este frontend HTML/CSS/JS consome a API fornecida no seu ZIP (`EstoqueServer.java`).
 
-API HTTP em **Java 17+** usando o servidor nativo `com.sun.net.httpserver.HttpServer`.  
-Persistência em **CSV** (`estoque.csv`, `movimentacoes.csv`) com **CORS habilitado**.
-
-> ✅ Datas automáticas: **entrada** no cadastro (`LocalDate.now()`) e **saída** na venda (`LocalDateTime.now()`).
-
----
-
-## 🚀 Como executar
+## Como executar o backend
+1. Abra o projeto Java do ZIP em um terminal.
+2. Compile (via Maven) e execute o servidor (porta 8080):
 
 ```bash
-javac EstoqueServer.java
-java EstoqueServer
-```
-Servidor: **http://localhost:8080**  
-Base da API: **http://localhost:8080/api**
-
-> Os dados são carregados dos CSVs na inicialização e salvos em cada alteração e no desligamento.
-
----
-
-## 🗂️ Estrutura dos dados
-
-### Produto (response)
-```json
-{
-  "id": "e8f2a3c0-xxxx-xxxx-xxxx-a1",
-  "nome": "Mouse Gamer",
-  "preco": 129.9,
-  "quantidade": 10,
-  "dataEntrada": "2025-08-22",
-  "ultimaSaida": "2025-08-22T19:25:10.123",
-  "estoqueBaixo": false
-}
+# dentro do projeto do servidor
+mvn -q -DskipTests package
+java -cp target/classes EstoqueServer
+# o console deve exibir: http://localhost:8080
 ```
 
-### Movimentação (response)
-```json
-{
-  "dataHora": "2025-08-22T19:25:10.123",
-  "tipo": "SAIDA",
-  "idProduto": "e8f2a3c0-xxxx",
-  "nomeProduto": "Mouse Gamer",
-  "quantidade": 2,
-  "valorUnitario": 129.9
-}
-```
+> Opcional (se preferir e tiver plugin configurado):  
+> `mvn exec:java -Dexec.mainClass=EstoqueServer`
 
-### Erro (response)
-```json
-{ "erro": "mensagem explicativa" }
-```
+## Como usar o frontend
+1. Depois do backend estar rodando em `http://localhost:8080`, abra o arquivo `index.html` desta pasta no seu navegador (clique duas vezes ou use um servidor estático).
+2. Recursos prontos:
+   - Listagem com busca e ordenação (nome, preço, quantidade, data de entrada, última saída)
+   - Cadastro de produto
+   - Vender (cria movimentação de saída)
+   - Alterar preço
+   - Renomear produto
+   - Ajustar quantidade (valor absoluto)
+   - Remoção de produto
+   - Exibição do histórico de movimentações
+   - Configuração do limite de estoque baixo
 
----
+> A API já expõe CORS liberado. Se desejar mudar a URL base, defina `window.API_BASE` antes do `app.js`.
 
-## 🔐 Rotas
+## Endpoints usados
+- `GET /api/produtos?buscar=&ordenarPor=`
+- `POST /api/produtos`  (body: `{ nome, preco, quantidade }`)
+- `GET /api/produtos/{id}`
+- `DELETE /api/produtos/{id}`
+- `POST /api/produtos/{id}/vendas`  (body: `{ quantidade }`)
+- `PATCH /api/produtos/{id}/preco`  (body: `{ novoPreco }`)
+- `PATCH /api/produtos/{id}/renomear`  (body: `{ novoNome }`)
+- `PATCH /api/produtos/{id}/quantidade` (body: `{ novaQuantidade }`)
+- `GET /api/movimentacoes`
+- `GET /api/config/limite-baixa`
+- `PUT /api/config/limite-baixa/{valor}`
 
-Base URL: `http://localhost:8080/api`
-
-### 📌 Produtos
-
-| Método | Endpoint                        | Descrição                                    | Body (JSON) |
-|--------|----------------------------------|----------------------------------------------|-------------|
-| GET    | `/produtos`                     | Lista produtos (com busca/ordenação)         | — |
-| POST   | `/produtos`                     | Cria produto                                  | `{"nome","preco","quantidade"}` |
-| GET    | `/produtos/{id}`                | Obtém produto por ID                          | — |
-| DELETE | `/produtos/{id}`                | Remove produto                                | — |
-| PATCH  | `/produtos/{id}/preco`          | Altera preço                                  | `{"novoPreco"}` |
-| PATCH  | `/produtos/{id}/renomear`       | Renomeia produto                              | `{"novoNome"}` |
-| PATCH  | `/produtos/{id}/quantidade`     | Ajusta quantidade (entrada manual)            | `{"novaQuantidade"}` |
-| POST   | `/produtos/{id}/vendas`         | Registra venda (registra data/hora de saída)  | `{"quantidade"}` |
-
-**Query params em `GET /produtos`**  
-- `buscar=termo` — filtra por nome (contém)  
-- `ordenarPor=nome|preco|quantidade|entrada` — ordena (padrão: `nome`)
-
-### 📌 Movimentações
-| Método | Endpoint             | Descrição                                   |
-|--------|----------------------|---------------------------------------------|
-| GET    | `/movimentacoes`     | Lista histórico de entradas e saídas        |
-
-### ⚙️ Configuração
-| Método | Endpoint                          | Descrição                          |
-|--------|-----------------------------------|------------------------------------|
-| GET    | `/config/limite-baixa`            | Obtém limite de estoque baixo      |
-| PUT    | `/config/limite-baixa/{valor}`    | Define novo limite                 |
-
----
-
-## 🧪 Exemplos (cURL)
-
-### Criar produto
-```bash
-curl -X POST http://localhost:8080/api/produtos   -H "Content-Type: application/json"   -d '{"nome":"Mouse Gamer","preco":129.90,"quantidade":10}'
-```
-
-### Listar produtos (busca e ordenação)
-```bash
-curl "http://localhost:8080/api/produtos?buscar=mouse&ordenarPor=preco"
-```
-
-### Obter por ID
-```bash
-curl http://localhost:8080/api/produtos/<ID>
-```
-
-### Registrar venda
-```bash
-curl -X POST http://localhost:8080/api/produtos/<ID>/vendas   -H "Content-Type: application/json"   -d '{"quantidade":2}'
-```
-
-### Alterar preço
-```bash
-curl -X PATCH http://localhost:8080/api/produtos/<ID>/preco   -H "Content-Type: application/json"   -d '{"novoPreco":119.90}'
-```
-
-### Ajustar quantidade
-```bash
-curl -X PATCH http://localhost:8080/api/produtos/<ID>/quantidade   -H "Content-Type: application/json"   -d '{"novaQuantidade":25}'
-```
-
-### Renomear
-```bash
-curl -X PATCH http://localhost:8080/api/produtos/<ID>/renomear   -H "Content-Type: application/json"   -d '{"novoNome":"Mouse Sem Fio"}'
-```
-
-### Remover
-```bash
-curl -X DELETE http://localhost:8080/api/produtos/<ID>
-```
-
-### Histórico
-```bash
-curl http://localhost:8080/api/movimentacoes
-```
-
-### Limite de estoque baixo
-```bash
-curl http://localhost:8080/api/config/limite-baixa
-curl -X PUT http://localhost:8080/api/config/limite-baixa/3
-```
-
----
-
-## 🧾 Persistência
-
-- `estoque.csv`: id;nome;preco;quantidade;dataEntrada;ultimaSaida  
-- `movimentacoes.csv`: dataHora;tipo;idProduto;nomeProduto;quantidade;valorUnitario
-
----
-
-## 🧰 Dica de desenvolvimento
-
-- Use ferramentas como **Postman** ou **Insomnia** com a coleção abaixo para testar as rotas rapidamente.
+## Observações
+- O visual é responsivo e em PT‑BR, seguindo seu estilo preferido (querySelector e arrow functions).
+- O alerta “Estoque baixo” aparece quando `quantidade <= limite` informado pela API.

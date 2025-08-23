@@ -1,4 +1,6 @@
-idProduto;nomeProduto;tipo;quantidade;valorUnit;dataHora
-1b1b7719-e0e8-458b-ac36-077335dfc4ad;manteiga del¡cia;ENTRADA;3;3.50;2025-08-22T20:02:35.1398658
-1b1b7719-e0e8-458b-ac36-077335dfc4ad;manteiga del¡cia;SAIDA;2;3.50;2025-08-22T20:03:09.5819762
-03f1efdc-434d-49df-a2cf-f4c05b4ec24e;desodorante nivea;ENTRADA;10;4.50;2025-08-22T20:04:10.6300061
+dataHora;tipo;idProduto;nomeProduto;quantidade;valorUnitario
+2025-08-23T09:13:40.7535521;SAIDA;03f1efdc-434d-49df-a2cf-f4c05b4ec24e;desodorante nivea;3;4.50
+2025-08-23T09:18:30.533999;ENTRADA;1b1b7719-e0e8-458b-ac36-077335dfc4ad;manteiga del¡cia;4;2.00
+2025-08-23T09:18:55.1910961;ENTRADA;03f1efdc-434d-49df-a2cf-f4c05b4ec24e;desodorante nivea;116;4.50
+2025-08-23T09:19:02.0324977;ENTRADA;1b1b7719-e0e8-458b-ac36-077335dfc4ad;manteiga del¡cia;347;2.00
+2025-08-23T09:27:19.964185;ENTRADA;18194033-fba8-4058-9951-26c593722a0a;Sabonete protex;46;3.00

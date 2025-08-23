@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Controle de Estoque – Frontend</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>📦 Controle de Estoque</h1>
+    <div class="top-actions">
+      <div class="limite">
+        <label for="limiteBaixa">Limite de estoque baixo:</label>
+        <input id="limiteBaixa" type="number" min="0" step="1" />
+        <button id="salvarLimite" class="btn primary">Salvar</button>
+      </div>
+      <button id="abrirNovoProduto" class="btn success">+ Novo Produto</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="filtros">
+      <div class="field">
+        <label for="buscar">Buscar</label>
+        <input id="buscar" type="search" placeholder="Nome do produto..." />
+      </div>
+      <div class="field">
+        <label for="ordenarPor">Ordenar por</label>
+        <select id="ordenarPor">
+          <option value="nome">Nome</option>
+          <option value="preco">Preço</option>
+          <option value="quantidade">Quantidade</option>
+          <option value="entrada">Data de entrada</option>
+          <option value="saida">Última saída</option>
+        </select>
+      </div>
+      <button id="aplicarFiltros" class="btn">Aplicar</button>
+    </section>
+
+    <section>
+      <h2 class="section-title">Produtos</h2>
+      <div id="listaProdutos" class="grid"></div>
+      <div id="vazio" class="vazio" hidden>Nenhum produto encontrado.</div>
+    </section>
+
+    <section class="historico">
+      <h2 class="section-title">Histórico de Movimentações</h2>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Data/Hora</th>
+              <th>Tipo</th>
+              <th>Produto</th>
+              <th>Qtd.</th>
+              <th>Valor Unitário</th>
+            </tr>
+          </thead>
+          <tbody id="tMovs"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  
+  <dialog id="modalProduto">
+    <form method="dialog" class="modal-card modal-card--elev" id="formProduto">
+      <h3 id="tituloModalProd">Novo Produto</h3>
+<fieldset class="fieldset">
+  <legend class="legend">Preencha os campos abaixo</legend>
+  <p class="legend-sub">Dica: o <strong>Preço</strong> aceita centavos (ex.: 12,50). A <strong>Quantidade</strong> deve ser um número inteiro.</p>
+  <div class="grid grid-2">
+    <div class="field">
+      <label for="nomeProduto">Nome <span class="hint">Ex.: Caneca Personalizada</span></label>
+      <input id="nomeProduto" type="text" required placeholder="Digite o nome do produto" />
+      <small class="help">Nome que aparecerá na listagem e no histórico de movimentações.</small>
+    </div>
+    <div class="field">
+      <label for="precoProduto">Preço (R$) <span class="hint">Ex.: 49,90</span></label>
+      <input id="precoProduto" type="number" min="0" step="0.01" required placeholder="0,00" inputmode="decimal" />
+      <small class="help">Valor unitário de venda. Pode incluir casas decimais.</small>
+    </div>
+    <div class="field">
+      <label for="qtdProduto">Quantidade <span class="hint">Ex.: 10</span></label>
+      <input id="qtdProduto" type="number" min="0" step="1" required placeholder="0" inputmode="numeric" />
+      <small class="help">Estoque inicial disponível.</small>
+    </div>
+  </div>
+</fieldset>
+<div class="modal-actions">
+        <button type="submit" class="btn success">Salvar</button>
+        <button type="button" class="btn" id="fecharModalProduto">Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+
+  
+  <dialog id="modalAcoes">
+    <form method="dialog" class="modal-card modal-card--elev" id="formAcoes">
+      <h3 id="tituloModalAcoes">Ações</h3>
+      <fieldset class="fieldset"><legend class="legend">Detalhes da ação</legend><div id="acoesConteudo"></div></fieldset>
+      <div class="modal-actions">
+        <button type="submit" class="btn primary">Confirmar</button>
+        <button type="button" class="btn" id="fecharModalAcoes">Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <footer class="footer">
+    <small>Frontend para a API de Estoque (porta 8080). Feito em HTML/CSS/JS puro.</small>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
