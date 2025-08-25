@@ -91,7 +91,6 @@ const renderProdutos = (lista) => {
   lista.forEach(p => wrap.appendChild(criarCardProduto(p)));
 };
 
-// Movimentações
 const carregarMovs = async () => {
   const dados = await getJSON(`${API}/movimentacoes`);
   const tbody = $('#tMovs');
@@ -249,3 +248,22 @@ $('#formAcoes').addEventListener('submit', async (e)=>{
 
 // Inicialização
 carregarTudo().catch(err => showToast('Falha ao carregar dados: ' + err.message, false));
+
+
+// Exibe o popup de confirmação ao clicar no botão
+$('#limparHistorico').addEventListener('click', () => {
+  document.getElementById('popupConfirm').style.display = 'flex';
+});
+
+// Botão "Não" fecha o popup
+document.getElementById('btnConfirmNo').addEventListener('click', () => {
+  document.getElementById('popupConfirm').style.display = 'none';
+});
+
+// Botão "Sim" faz requisição DELETE e limpa a tabela
+document.getElementById('btnConfirmYes').addEventListener('click', async () => {
+  await fetch(API + '/movimentacoes', { method: 'DELETE' });
+  await carregarMovs();
+  document.getElementById('tMovs').innerHTML = '';
+  document.getElementById('popupConfirm').style.display = 'none';
+});

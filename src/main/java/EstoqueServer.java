@@ -47,7 +47,9 @@ public class EstoqueServer {
         }
 
         static Produto novo(String nome, BigDecimal preco, int quantidade) {
-            return new Produto(UUID.randomUUID().toString(), nome, preco, quantidade, LocalDate.now(), null);
+            String uuid = UUID.randomUUID().toString().replaceAll("[^a-zA-Z0-9]", "");
+            String idCurto = uuid.substring(0, 8);
+            return new Produto(idCurto, nome, preco, quantidade, LocalDate.now(), null);
         }
 
         String getId() { return id; }
@@ -90,6 +92,13 @@ public class EstoqueServer {
     }
 
     static final class Store {
+        // Limpa o histórico de movimentações e o arquivo
+        static void limparMovimentacoes() {
+            MOVS.clear();
+            try (BufferedWriter w = Files.newBufferedWriter(MOV, StandardCharsets.UTF_8)) {
+                w.write("dataHora;tipo;idProduto;nomeProduto;quantidade;valorUnitario\n");
+            } catch (IOException ignored) {}
+        }
         private static final Map<String, Produto> PRODUTOS = new ConcurrentHashMap<>();
         private static final List<Movimentacao> MOVS = new CopyOnWriteArrayList<>();
         private static volatile int LIMITE_BAIXA = 5;
@@ -334,6 +343,11 @@ public class EstoqueServer {
         }
 
         void handleMovs(HttpExchange ex, String method) throws IOException {
+            if (method.equals("DELETE")) {
+                Store.limparMovimentacoes();
+                send(ex, 204, "");
+                return;
+            }
             if (!method.equals("GET")) { send(ex, 405, json(Map.of("erro","método não permitido"))); return; }
             List<Map<String,Object>> out = new ArrayList<>();
             for (var m : Store.historico()) {

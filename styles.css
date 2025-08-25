@@ -247,3 +247,55 @@ thead th{
 label[for="nomeProduto"], label[for="qtdProduto"], label[for="precoProduto"]{
   color: white;
 }
+
+
+.popup-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.popup-content {
+  background: var(--card);
+  color: var(--text);
+  padding: 2em;
+  border-radius: 8px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+  text-align: center;
+}
+#popupConfirm .popup-content button {
+  padding: 0.7em 2em;
+  margin: 0 0.5em;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#btnConfirmYes {
+  background: #44d3a4;
+  color: #fff;
+}
+
+#btnConfirmYes:hover {
+  background: #2bb07b;
+}
+
+#btnConfirmNo {
+  background: #ff637b;
+  color: #fff;
+}
+
+#btnConfirmNo:hover {
+  background: #d13a54;
+}
+
+.popup-content p {
+  color: var(--text);
+  font-size: 1.1em;
+  margin-bottom: 1.5em;
+}
