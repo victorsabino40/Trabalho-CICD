@@ -22,10 +22,6 @@
   <main class="container">
     <section class="filtros">
       <div class="field">
-        <label for="buscar">Buscar</label>
-        <input id="buscar" type="search" placeholder="Nome do produto..." />
-      </div>
-      <div class="field">
         <label for="ordenarPor">Ordenar por</label>
         <select id="ordenarPor">
           <option value="nome">Nome</option>
@@ -34,6 +30,10 @@
           <option value="entrada">Data de entrada</option>
           <option value="saida">Última saída</option>
         </select>
+      </div>
+      <div class="field">
+        <label for="buscar">Buscar</label>
+        <input id="buscar" type="search" placeholder="Nome do produto..." />
       </div>
       <button id="aplicarFiltros" class="btn">Aplicar</button>
     </section>
@@ -103,6 +103,7 @@
     <form method="dialog" class="modal-card modal-card--elev" id="formAcoes">
       <h3 id="tituloModalAcoes">Ações</h3>
       <fieldset class="fieldset"><legend class="legend">Detalhes da ação</legend><div id="acoesConteudo"></div></fieldset>
+      <div id="toastAcoes" class="toast" hidden></div>
       <div class="modal-actions">
         <button type="submit" class="btn primary">Confirmar</button>
         <button type="button" class="btn" id="fecharModalAcoes">Cancelar</button>

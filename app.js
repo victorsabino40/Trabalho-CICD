@@ -56,13 +56,23 @@ const listarProdutos = async () => {
 const criarCardProduto = (p) => {
   const el = document.createElement('div');
   el.className = 'card';
-  // Função para formatar data para DD/MM/AA
-  const formatarDataBR = (dataStr) => {
+  // Função para formatar data para DD/MM/AA HH:MM
+  const formatarDataHoraBR = (dataStr) => {
     if (!dataStr) return '—';
-    // Aceita formatos ISO: "2025-08-25" ou "2025-08-25T20:21:22"
-    const partes = dataStr.split('T')[0].split('-');
-    if (partes.length === 3) {
-      return `${partes[2]}/${partes[1]}/${partes[0].slice(2)}`;
+    const [data, hora] = dataStr.split('T');
+    if (data && hora) {
+      const partes = data.split('-');
+      const horaMin = hora.split(':');
+      if (partes.length === 3 && horaMin.length >= 2) {
+        return `${partes[2]}/${partes[1]}/${partes[0].slice(2)} ${horaMin[0]}:${horaMin[1]}`;
+      }
+    }
+    // Se não tiver hora, só data
+    if (dataStr.length === 10) {
+      const partes = dataStr.split('-');
+      if (partes.length === 3) {
+        return `${partes[2]}/${partes[1]}/${partes[0].slice(2)}`;
+      }
     }
     return dataStr;
   };
@@ -79,7 +89,7 @@ const criarCardProduto = (p) => {
         ${p.estoqueBaixo ? '<span class="badge low">Estoque baixo</span>' : ''}
       </div>
     </div>
-    <div class="meta">Entrada: ${formatarDataBR(p.dataEntrada)} · Última saída: ${p.ultimaSaida ? formatarDataBR(p.ultimaSaida) : '—'}</div>
+    <div class="meta">Entrada: ${formatarDataHoraBR(p.dataEntrada)} · Última saída: ${p.ultimaSaida ? formatarDataHoraBR(p.ultimaSaida) : '—'}</div>
     <div class="actions">
       <button class="btn primary" data-acao="vender" data-id="${p.id}">Vender</button>
       <button class="btn" data-acao="preco" data-id="${p.id}">Alterar preço</button>
@@ -269,6 +279,8 @@ $('#formAcoes').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const id = e.currentTarget.dataset.id;
   const acao = e.currentTarget.dataset.acao;
+  const toastAcoes = document.getElementById('toastAcoes');
+  toastAcoes.hidden = true;
   try{
     if (acao === 'vender') {
       const quantidade = Number($('#qtdVenda').value);
@@ -287,7 +299,10 @@ $('#formAcoes').addEventListener('submit', async (e)=>{
     fecharModalAcoes();
     await Promise.all([listarProdutos(), carregarMovs()]);
   }catch(err){
-    showToast('Erro: ' + err.message, false);
+    toastAcoes.textContent = 'Erro: ' + err.message;
+    toastAcoes.style.borderColor = 'rgba(255,99,123,.6)';
+    toastAcoes.hidden = false;
+    setTimeout(() => { toastAcoes.hidden = true; }, 2600);
   }
 });
 

@@ -36,9 +36,14 @@ body{
 .filtros{ display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
 .field{ display:flex; flex-direction:column; gap:6px; }
 .field input, .field select{
-  background: #0e1330; border: 1px solid rgba(255,255,255,.08); color: var(--text);
-  padding: 10px 12px; border-radius: 12px; outline: none;
-  box-shadow: 0 0 0 0 var(--ring); transition: box-shadow .2s, border-color .2s;
+  background: linear-gradient(180deg, #0b1133, #0a0f2e);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px 14px;
+  border-radius: 14px;
+  outline: none;
+  box-shadow: 0 0 0 0 var(--ring);
+  transition: box-shadow .2s, border-color .2s;
 }
 .field input:focus, .field select:focus{ border-color: var(--primary); box-shadow: 0 0 0 6px var(--ring); }
 
@@ -110,6 +115,9 @@ dialog{ border:none; background: transparent; }
   position: fixed; right: 16px; bottom: 16px; background: #12163a; color: var(--text);
   border:1px solid rgba(255,255,255,.16); padding: 12px 14px; border-radius: 12px;
   box-shadow: 0 12px 28px rgba(0,0,0,.35); max-width: 90vw;
+  backdrop-filter: none !important;
+  filter: none !important;
+  backdrop-filter: none;
 }
 
 
@@ -213,39 +221,32 @@ thead th{
   outline-offset: 2px;
   border-radius: 10px;
 }
-.field select{
-  background: #fff !important;
-  color: #000 !important;
-  border: 1px solid #ccc !important;
+/* Remove fundo branco do select e opções */
+.field select, #ordenarPor {
+  background: linear-gradient(180deg, #0b1133, #0a0f2e) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
 }
-.field select:focus{
-  border-color: #6c7bff !important;
-  box-shadow: 0 0 0 4px rgba(108,123,255,.35) !important;
-}
-#ordenarPor{
-  background: #fff;
-  color: #000;
-  border: 1px solid #cfd3dc;
-  box-shadow: none;
-}
-#ordenarPor:hover{
-  background: #f7f7f7;
-}
-#ordenarPor:focus{
-  border-color: #1967d2;
-  box-shadow: 0 0 0 4px rgba(25,103,210,.18);
-}
-#ordenarPor option{
-  color: #000;
-  background: #fff;
+#ordenarPor option {
+  color: var(--text);
+  background: #15193a;
 }
 
-#tituloModalProd{
-  color: white;
+/* Títulos dos popups/modal de ações */
+#tituloModalProd,
+#tituloModalAcoes {
+  color: #fff;
 }
 
-label[for="nomeProduto"], label[for="qtdProduto"], label[for="precoProduto"]{
-  color: white;
+label[for="nomeProduto"],
+label[for="qtdProduto"],
+label[for="precoProduto"],
+label[for="qtdVenda"],
+label[for="novoPreco"],
+label[for="novoNome"],
+label[for="novaQuantidade"] {
+  color: #fff;
 }
 
 

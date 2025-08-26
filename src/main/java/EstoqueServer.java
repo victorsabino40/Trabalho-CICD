@@ -65,7 +65,7 @@ public class EstoqueServer {
     }
 
     static final class Movimentacao {
-        enum Tipo { ENTRADA, SAIDA }
+    enum Tipo { ENTRADA, SAIDA, ALTERADO }
         private LocalDateTime dataHora;
         private final Tipo tipo;
         private final String idProduto;
@@ -152,7 +152,9 @@ public class EstoqueServer {
             if (novaQuantidade < 0) throw new IllegalArgumentException("quantidade inválida");
             int delta = novaQuantidade - p.getQuantidade();
             p.setQuantidade(novaQuantidade);
-            if (delta > 0) MOVS.add(new Movimentacao(Movimentacao.Tipo.ENTRADA, p.getId(), p.getNome(), delta, p.getPreco()));
+            if (delta != 0) {
+                MOVS.add(new Movimentacao(Movimentacao.Tipo.ALTERADO, p.getId(), p.getNome(), delta, p.getPreco()));
+            }
             return p;
         }
 
