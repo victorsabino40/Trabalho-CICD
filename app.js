@@ -56,6 +56,17 @@ const listarProdutos = async () => {
 const criarCardProduto = (p) => {
   const el = document.createElement('div');
   el.className = 'card';
+  // Função para formatar data para DD/MM/AA
+  const formatarDataBR = (dataStr) => {
+    if (!dataStr) return '—';
+    // Aceita formatos ISO: "2025-08-25" ou "2025-08-25T20:21:22"
+    const partes = dataStr.split('T')[0].split('-');
+    if (partes.length === 3) {
+      return `${partes[2]}/${partes[1]}/${partes[0].slice(2)}`;
+    }
+    return dataStr;
+  };
+
   el.innerHTML = `
     <div class="card-header">
       <div>
@@ -68,7 +79,7 @@ const criarCardProduto = (p) => {
         ${p.estoqueBaixo ? '<span class="badge low">Estoque baixo</span>' : ''}
       </div>
     </div>
-    <div class="meta">Entrada: ${p.dataEntrada} · Última saída: ${p.ultimaSaida ? p.ultimaSaida.replace('T',' ') : '—'}</div>
+    <div class="meta">Entrada: ${formatarDataBR(p.dataEntrada)} · Última saída: ${p.ultimaSaida ? formatarDataBR(p.ultimaSaida) : '—'}</div>
     <div class="actions">
       <button class="btn primary" data-acao="vender" data-id="${p.id}">Vender</button>
       <button class="btn" data-acao="preco" data-id="${p.id}">Alterar preço</button>
@@ -95,10 +106,31 @@ const carregarMovs = async () => {
   const dados = await getJSON(`${API}/movimentacoes`);
   const tbody = $('#tMovs');
   tbody.innerHTML = '';
+  // Função para formatar data para DD/MM/AA
+  const formatarDataHoraBR = (dataStr) => {
+    if (!dataStr) return '—';
+    // Aceita formatos ISO: "2025-08-25T20:21:22"
+    const [data, hora] = dataStr.split('T');
+    if (data && hora) {
+      const partes = data.split('-');
+      const horaMin = hora.split(':');
+      if (partes.length === 3 && horaMin.length >= 2) {
+        return `${partes[2]}/${partes[1]}/${partes[0].slice(2)} - ${horaMin[0]}:${horaMin[1]}`;
+      }
+    }
+    // Se não tiver hora, só data
+    if (dataStr.length === 10) {
+      const partes = dataStr.split('-');
+      if (partes.length === 3) {
+        return `${partes[2]}/${partes[1]}/${partes[0].slice(2)}`;
+      }
+    }
+    return dataStr;
+  };
   dados.forEach(m => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${m.dataHora.replace('T',' ')}</td>
+      <td>${formatarDataHoraBR(m.dataHora)}</td>
       <td>${m.tipo}</td>
       <td>${m.nomeProduto}</td>
       <td>${m.quantidade}</td>
