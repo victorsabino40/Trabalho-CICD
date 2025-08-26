@@ -91,11 +91,11 @@ const criarCardProduto = (p) => {
     </div>
     <div class="meta">Entrada: ${formatarDataHoraBR(p.dataEntrada)} · Última saída: ${p.ultimaSaida ? formatarDataHoraBR(p.ultimaSaida) : '—'}</div>
     <div class="actions">
-      <button class="btn primary" data-acao="vender" data-id="${p.id}">Vender</button>
-      <button class="btn" data-acao="preco" data-id="${p.id}">Alterar preço</button>
-      <button class="btn" data-acao="renomear" data-id="${p.id}">Renomear</button>
-      <button class="btn warning" data-acao="quantidade" data-id="${p.id}">Ajustar quantidade</button>
-      <button class="btn danger" data-acao="remover" data-id="${p.id}">Remover</button>
+      <button class="btn btn-vender" data-acao="vender" data-id="${p.id}">Vender</button>
+      <button class="btn btn-alterar-preco" data-acao="preco" data-id="${p.id}">Alterar preço</button>
+      <button class="btn btn-renomear" data-acao="renomear" data-id="${p.id}">Renomear</button>
+      <button class="btn btn-ajustar-quantidade" data-acao="quantidade" data-id="${p.id}">Ajustar quantidade</button>
+      <button class="btn btn-remover" data-acao="remover" data-id="${p.id}">Remover</button>
     </div>
   `;
   return el;
