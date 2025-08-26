@@ -206,17 +206,30 @@ $('#listaProdutos').addEventListener('click', async (e)=>{
   if(!btn) return;
   const { acao, id } = btn.dataset;
   if (acao === 'remover') {
-    if (!confirm('Confirma remover este produto?')) return;
-    try{
-      await getJSON(`${API}/produtos/${id}`, { method:'DELETE' });
-      showToast('Produto removido.');
-      await Promise.all([listarProdutos(), carregarMovs()]);
-    }catch(err){
-      showToast('Erro ao remover: ' + err.message, false);
-    }
+    // Exibe popup estilizado para remover produto
+    window.produtoRemoverId = id;
+    document.getElementById('popupRemoverProduto').style.display = 'flex';
     return;
   }
   abrirAcoes(id, acao);
+});
+// Exibe popup estilizado para remover produto
+document.getElementById('btnRemoverNao').addEventListener('click', () => {
+  document.getElementById('popupRemoverProduto').style.display = 'none';
+  window.produtoRemoverId = null;
+});
+
+document.getElementById('btnRemoverSim').addEventListener('click', async () => {
+  if (!window.produtoRemoverId) return;
+  try {
+    await getJSON(`${API}/produtos/${window.produtoRemoverId}`, { method:'DELETE' });
+    showToast('Produto removido.');
+    await Promise.all([listarProdutos(), carregarMovs()]);
+  } catch (err) {
+    showToast('Erro ao remover: ' + err.message, false);
+  }
+  document.getElementById('popupRemoverProduto').style.display = 'none';
+  window.produtoRemoverId = null;
 });
 
 // Submeter ações

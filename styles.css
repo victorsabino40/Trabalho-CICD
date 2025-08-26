@@ -266,7 +266,9 @@ label[for="nomeProduto"], label[for="qtdProduto"], label[for="precoProduto"]{
   box-shadow: 0 2px 16px rgba(0,0,0,0.2);
   text-align: center;
 }
-#popupConfirm .popup-content button {
+/* Botões de confirmação para ambos popups */
+#popupConfirm .popup-content button,
+#popupRemoverProduto .popup-content button {
   padding: 0.7em 2em;
   margin: 0 0.5em;
   border: none;
@@ -276,21 +278,21 @@ label[for="nomeProduto"], label[for="qtdProduto"], label[for="precoProduto"]{
   transition: background 0.2s;
 }
 
-#btnConfirmYes {
+#btnConfirmYes, #btnRemoverSim {
   background: #44d3a4;
   color: #fff;
 }
 
-#btnConfirmYes:hover {
+#btnConfirmYes:hover, #btnRemoverSim:hover {
   background: #2bb07b;
 }
 
-#btnConfirmNo {
+#btnConfirmNo, #btnRemoverNao {
   background: #ff637b;
   color: #fff;
 }
 
-#btnConfirmNo:hover {
+#btnConfirmNo:hover, #btnRemoverNao:hover {
   background: #d13a54;
 }
 
@@ -298,4 +300,27 @@ label[for="nomeProduto"], label[for="qtdProduto"], label[for="precoProduto"]{
   color: var(--text);
   font-size: 1.1em;
   margin-bottom: 1.5em;
+}
+.popup-confirm {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(30, 32, 36, 0.95);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.popup-confirm .btn {
+  min-width: 80px;
+  font-size: 1rem;
+}
+.popup-confirm .btn.danger {
+  background: #ff637b;
+  color: #fff;
+}
+.popup-confirm .btn:hover {
+  filter: brightness(1.1);
 }
