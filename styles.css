@@ -1,3 +1,14 @@
+.actions-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.actions-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
 #ordenarPor option {
   background: #15193a;
   color: #f5f7ff;
@@ -96,30 +107,30 @@ body{
   cursor:pointer; transition: transform .04s ease, box-shadow .2s, background .2s, border-color .2s;
 }
 .btn-alterar-preco {
-  background: hsl(32, 100%, 60%);
-  color: #f5f7ff;
-  border: none;
-}
-.btn-alterar-preco:hover {
-  background: hsla(32, 100%, 60%, 0.514);
-  cursor:pointer; transition: transform .04s ease, box-shadow .2s, background .2s, border-color .2s;
-}
-.btn-renomear {
-  background: #fac001;
-  color: #f5f7ff;
-  border: none;
-}
-.btn-renomear:hover {
-  background: #fac00181;
-  cursor:pointer; transition: transform .04s ease, box-shadow .2s, background .2s, border-color .2s;
-}
-.btn-ajustar-quantidade {
   background: #6c7bff;
   color: #f5f7ff;
   border: none;
 }
+.btn-alterar-preco:hover {
+  background: #6c7bff85;
+  cursor:pointer; transition: transform .04s ease, box-shadow .2s, background .2s, border-color .2s;
+}
+.btn-renomear {
+  background: #6c7bff;
+  color: #f5f7ff;
+  border: none;
+}
+.btn-renomear:hover {
+  background: #6c7bff85;
+  cursor:pointer; transition: transform .04s ease, box-shadow .2s, background .2s, border-color .2s;
+}
+.btn-ajustar-quantidade {
+  background: #ffa600;
+  color: #f5f7ff;
+  border: none;
+}
 .btn-ajustar-quantidade:hover {
-  background: #6c7bff8a;
+  background: #ffa60085;
   cursor:pointer; transition: transform .04s ease, box-shadow .2s, background .2s, border-color .2s;
 }
 .btn-remover {
@@ -128,7 +139,7 @@ body{
   border: none;
 }
 .btn-remover:hover {
-  background: #ff000083;
+  background: #ff000085;
   cursor:pointer; transition: transform .04s ease, box-shadow .2s, background .2s, border-color .2s;
 }
   
@@ -370,4 +381,8 @@ label[for="novaQuantidade"] {
 }
 .popup-confirm .btn:hover {
   filter: brightness(1.1);
+}
+
+.actions {
+  justify-content: center;
 }
