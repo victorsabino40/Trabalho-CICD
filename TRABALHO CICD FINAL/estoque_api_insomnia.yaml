@@ -1,0 +1,70 @@
+_type: export
+__export_format: 4
+__export_date: 2025-08-22T23:38:38.176284Z
+__export_source: chatgpt
+resources:
+  - _id: wrk_estoque_api
+    parentId: null
+    modified: 1755905918176
+    created: 1755905918176
+    name: Estoque API
+    _type: workspace
+  - _id: req_listar_produtos
+    parentId: wrk_estoque_api
+    modified: 1755905918176
+    created: 1755905918176
+    url: http://localhost:8080/api/produtos
+    name: Listar produtos
+    method: GET
+    body: {}
+    parameters: []
+    headers: []
+    authentication: {}
+    metaSortKey: -1
+    _type: request
+  - _id: req_criar_produto
+    parentId: wrk_estoque_api
+    modified: 1755905918176
+    created: 1755905918176
+    url: http://localhost:8080/api/produtos
+    name: Criar produto
+    method: POST
+    body:
+      mimeType: application/json
+      text: |
+        {"nome":"Mouse Gamer","preco":129.90,"quantidade":10}
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -2
+    _type: request
+  - _id: req_vender
+    parentId: wrk_estoque_api
+    modified: 1755905918176
+    created: 1755905918176
+    url: http://localhost:8080/api/produtos/{ID}/vendas
+    name: Registrar venda
+    method: POST
+    body:
+      mimeType: application/json
+      text: |
+        {"quantidade":2}
+    headers:
+      - name: Content-Type
+        value: application/json
+    authentication: {}
+    metaSortKey: -3
+    _type: request
+  - _id: req_movs
+    parentId: wrk_estoque_api
+    modified: 1755905918176
+    created: 1755905918176
+    url: http://localhost:8080/api/movimentacoes
+    name: Movimentações
+    method: GET
+    body: {}
+    headers: []
+    authentication: {}
+    metaSortKey: -4
+    _type: request

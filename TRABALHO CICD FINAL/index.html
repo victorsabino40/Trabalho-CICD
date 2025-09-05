@@ -1,0 +1,3766 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Controle de Estoque – Frontend</title>
+  <link rel="stylesheet" href="./styles.css" />
+
+<style>
+/* Destaque suave quando um produto é atualizado na visão de Estado Atual */
+@keyframes flash-bg { 
+  0% { background-color: rgba(255, 235, 59, 0.35); } 
+  100% { background-color: transparent; } 
+}
+#tEstado tr.flash {
+  animation: flash-bg 1.2s ease-in-out 1;
+}
+
+/* Mesmo efeito para o Histórico */
+#tMovs tr.flash {
+  animation: flash-bg 1.2s ease-in-out 1;
+}
+
+/* Badge "Atualizado agora" que some sozinho */
+.badge-new {
+  display: inline-block;
+  font-size: .75rem;
+  padding: .15rem .4rem;
+  border-radius: .4rem;
+  background: rgba(76, 175, 80, .15);
+  border: 1px solid rgba(76, 175, 80, .4);
+  margin-left: .4rem;
+  opacity: 1;
+  transition: opacity .6s ease;
+}
+.badge-new.fade {
+  opacity: 0;
+}
+
+/* Hover effects: sombra e leve elevação para todos os cards/tabelas */
+#tEstado tr:hover,
+#tMovs tr:hover,
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  transform: scale(1.01);
+  transition: all 0.2s ease-in-out;
+  background-color: rgba(255,255,255,0.9);
+}
+
+
+/* Bordas arredondadas para linhas das tabelas, estilo card */
+#tEstado tr,
+#tMovs tr {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+
+/* Espaçamento entre linhas para efeito de cartões separados */
+#tEstado tr,
+#tMovs tr {
+  margin-bottom: 8px;
+  display: block;
+}
+#tEstado,
+#tMovs {
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+
+
+/* Sombra fixa suave em todos os cards/linhas */
+#tEstado tr,
+#tMovs tr,
+.card {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  border-radius: 8px;
+}
+
+
+/* ==== FIX: organização e hover transparente ==== */
+/* Restaurar layout de tabela correto (evitar display:block em <tr>) */
+#tEstado tr, #tMovs tr { display: table-row !important; }
+/* Espaçamento entre linhas via border-spacing (sem quebrar tabela) */
+#tEstado, #tMovs { border-collapse: separate !important; border-spacing: 0 8px !important; }
+/* Bordas arredondadas aplicadas pelos extremos das células */
+#tEstado tr td:first-child, #tMovs tr td:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+#tEstado tr td:last-child,  #tMovs tr td:last-child  { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+/* Sombra fixa suave: usar drop-shadow para evitar glitches em table-row */
+#tEstado tr, #tMovs tr { box-shadow: none !important; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.15)); transition: filter .2s ease-in-out; }
+/* Hover com aumento sutil da sombra, sem alterar background */
+#tEstado tr:hover, #tMovs tr:hover { filter: drop-shadow(0 4px 12px rgba(0,0,0,0.25)); }
+/* Fundo SEMPRE transparente nas linhas (normal e hover) */
+#tEstado tr td, #tMovs tr td { background: transparent !important; }
+/* Cards de produto: manter sombra e hover transparente, sem "branco" */
+.card { box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: box-shadow .2s ease-in-out, transform .2s ease-in-out; background: transparent !important; }
+.card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.25); transform: translateY(-1px); background: transparent !important; }
+/* Remover qualquer escala em linhas de tabela (pode "bagunçar" tabela) */
+#tEstado tr:hover, #tMovs tr:hover { transform: none !important; }
+/* Badge continua igual (fade) */
+
+
+/* ==== Tema-aware hover highlight ==== */
+:root {
+  --shadow-light: 0 2px 6px rgba(0,0,0,0.15);
+  --shadow-strong: 0 4px 12px rgba(0,0,0,0.25);
+  --highlight-border: rgba(33, 150, 243, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shadow-light: 0 2px 6px rgba(0,0,0,0.4);
+    --shadow-strong: 0 4px 12px rgba(0,0,0,0.6);
+    --highlight-border: rgba(33, 150, 243, 0.7);
+  }
+}
+
+/* Aplicação nos elementos */
+#tEstado tr, #tMovs tr, .card {
+  box-shadow: var(--shadow-light);
+  border-radius: 8px;
+  transition: box-shadow .2s ease-in-out, transform .2s ease-in-out, border .2s ease-in-out;
+  background: transparent !important;
+  border: 1px solid transparent;
+}
+
+#tEstado tr:hover, #tMovs tr:hover, .card:hover {
+  box-shadow: var(--shadow-strong);
+  border: 1px solid var(--highlight-border);
+  background: transparent !important;
+}
+
+
+
+
+/* ==== Efeito simples de hover em cards, tabelas e botões ==== */
+.card {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: box-shadow .2s ease-in-out, transform .2s ease-in-out;
+  background: transparent !important;
+}
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  transform: translateY(-1px);
+}
+
+#tEstado tr, #tMovs tr {
+  transition: filter .2s ease-in-out;
+}
+#tEstado tr:hover, #tMovs tr:hover {
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.25));
+}
+
+button, .btn {
+  transition: transform .2s ease-in-out, box-shadow .2s ease-in-out;
+}
+button:hover, .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+}
+
+
+/* ==== Fundo do Estado Atual igual ao Histórico ==== */
+#tEstado tr td {
+  background: #fff !important;
+  transition: background 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+#tEstado tr:hover td {
+  background: #fff !important;
+}
+
+/* Hover mais intenso (sombra maior) para Estado Atual e Histórico */
+#tEstado tr:hover, #tMovs tr:hover, .card:hover, button:hover, .btn:hover {
+  box-shadow: 0 6px 16px rgba(0,0,0,0.35) !important;
+  transform: translateY(-2px);
+}
+
+
+/* ==== Fundo igual ao Histórico + Hover mais forte ==== */
+/* Fundo branco padronizado nas duas tabelas */
+#tEstado tr td,
+#tMovs tr td {
+  background: #ffffff !important;
+  transition: background .2s ease-in-out;
+}
+
+/* Hover mais forte nas linhas */
+#tEstado tr:hover,
+#tMovs tr:hover {
+  filter: drop-shadow(0 8px 22px rgba(0,0,0,0.30)) !important;
+}
+
+/* Cards de produto com hover mais intenso */
+.card:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.28) !important;
+  transform: translateY(-2px);
+}
+
+/* Botões com hover um pouco mais forte para acompanhar */
+button:hover, .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.28);
+}
+
+
+/* ==== Zebra background nas tabelas ==== */
+#tEstado tr:nth-child(even) td,
+#tMovs tr:nth-child(even) td {
+  background: #f8f9fa !important;
+}
+#tEstado tr:nth-child(odd) td,
+#tMovs tr:nth-child(odd) td {
+  background: #ffffff !important;
+}
+
+/* ==== Padronização dos títulos ==== */
+.section-title {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 0.75rem;
+}
+
+
+/* ==== Títulos padronizados ==== */
+.section-title {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2c2c2c;
+  margin: 0 0 .75rem 0;
+}
+
+/* ==== Zebra striping (fundo levemente cinza) ==== */
+#tEstado tr:nth-child(odd) td,
+#tMovs tr:nth-child(odd) td {
+  background: #f8f9fa !important;
+}
+#tEstado tr:nth-child(even) td,
+#tMovs tr:nth-child(even) td {
+  background: #ffffff !important;
+}
+
+
+/* ==== Ajuste dos títulos ==== */
+.section-title {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 1.75rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  margin: 0 0 .75rem 0;
+}
+
+
+/* ==== Títulos com sombra de texto ==== */
+.section-title {
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+}
+
+
+/* ==== Cabeçalhos das tabelas com sombra de texto ==== */
+#tEstado th,
+#tMovs th {
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+  color: #ffffff !important;
+}
+
+
+/* ==== Ajuste final ==== */
+/* Títulos principais */
+.section-title {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 1.75rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+}
+
+/* Cabeçalhos das tabelas */
+#tEstado th,
+#tMovs th {
+  color: #ffffff !important;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+}
+
+/* Dados das tabelas */
+#tEstado td,
+#tMovs td {
+  color: #000000 !important;
+  text-shadow: none !important;
+}
+
+
+/* ==== Títulos das colunas maiores ==== */
+#tEstado th,
+#tMovs th {
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+}
+
+
+/* ==== Espaço extra entre título e tabela ==== */
+#secEstadoAtual .section-title,
+section.historico .section-title {
+  display: block;
+  margin-bottom: 1.5rem !important;
+}
+
+
+/* ==== Espaço extra entre todos os títulos e suas seções ==== */
+#secEstadoAtual .section-title,
+section.historico .section-title,
+section .section-title {
+  display: block;
+  margin-bottom: 1.5rem !important;
+}
+
+
+/* ==== Centralização e espaçamentos extras ==== */
+/* Centralizar todos os títulos */
+.section-title {
+  text-align: center !important;
+}
+
+/* Espaço entre o botão Limpar Histórico e a tabela */
+#limparHistorico {
+  margin-bottom: 1rem !important;
+}
+
+/* Espaço extra acima da seção de Histórico */
+section.historico {
+  margin-top: 2rem !important;
+}
+
+
+/* ==== Centralização e espaçamentos solicitados ==== */
+/* Centralizar todos os títulos */
+.section-title { text-align: center !important; }
+/* Espaço entre o botão Limpar Histórico e a tabela */
+#limparHistorico { margin-bottom: 1rem !important; }
+/* Espaço extra acima da seção de Histórico */
+section.historico { margin-top: 2rem !important; }
+
+
+/* ==== Centralizar títulos das colunas e dados em negrito ==== */
+#tEstado th, #tMovs th { text-align: center !important; }
+#tEstado td, #tMovs td { font-weight: bold !important; }
+
+
+/* ==== Centralizar cabeçalhos e negrito nos dados ==== */
+#tEstado th,
+#tMovs th {
+  text-align: center !important;
+}
+#tEstado td,
+#tMovs td {
+  font-weight: bold !important;
+}
+
+
+/* ==== Espaço extra entre título e tabela do Estado Atual ==== */
+#secEstadoAtual .section-title {
+  display: block;
+  margin-bottom: 1.5rem !important;
+}
+
+
+/* ==== Espaço extra abaixo de todos os títulos ==== */
+.section-title {
+  display: block;
+  margin-bottom: 1.5rem !important;
+}
+
+
+/* ==== Espaçamento extra entre as seções ==== */
+section {
+  margin-bottom: 2.5rem !important;
+}
+
+
+/* ==== Linha divisória entre seções ==== */
+section {
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 1.5rem;
+  margin-bottom: 2.5rem !important;
+}
+
+/* ==== Alinhamento de títulos de colunas ==== */
+/* Centralizar colunas de texto/data */
+#tEstado th:nth-child(1),
+#tEstado th:nth-child(2),
+#tEstado th:nth-child(6),
+#tEstado th:nth-child(7),
+#tMovs th:nth-child(1),
+#tMovs th:nth-child(2),
+#tMovs th:nth-child(3),
+#tMovs th:nth-child(6),
+#tMovs th:nth-child(7) {
+  text-align: center !important;
+}
+
+/* Alinhar numéricos à direita */
+#tEstado th:nth-child(3),
+#tEstado th:nth-child(4),
+#tEstado th:nth-child(5),
+#tMovs th:nth-child(4),
+#tMovs th:nth-child(5) {
+  text-align: right !important;
+}
+
+/* Dados seguem mesmo padrão: centralizar texto/data, alinhar números à direita */
+#tEstado td:nth-child(1),
+#tEstado td:nth-child(2),
+#tEstado td:nth-child(6),
+#tEstado td:nth-child(7),
+#tMovs td:nth-child(1),
+#tMovs td:nth-child(2),
+#tMovs td:nth-child(3),
+#tMovs td:nth-child(6),
+#tMovs td:nth-child(7) {
+  text-align: center !important;
+}
+
+#tEstado td:nth-child(3),
+#tEstado td:nth-child(4),
+#tEstado td:nth-child(5),
+#tMovs td:nth-child(4),
+#tMovs td:nth-child(5) {
+  text-align: right !important;
+}
+
+
+/* ==== Linha divisória sutil entre seções ==== */
+section {
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 1.5rem;
+  margin-bottom: 2.5rem !important;
+}
+
+/* ==== Alinhamento dos títulos por tipo de coluna ==== */
+/* Estado Atual: 1 Atualizado, 2 Produto, 3 Quantidade, 4 Preço, 5 Valor total, 6 Última compra, 7 Última venda */
+#tEstado th:nth-child(1),
+#tEstado th:nth-child(2),
+#tEstado th:nth-child(6),
+#tEstado th:nth-child(7) {
+  text-align: center !important;
+}
+#tEstado th:nth-child(3),
+#tEstado th:nth-child(4),
+#tEstado th:nth-child(5) {
+  text-align: right !important;
+}
+
+/* Histórico: 1 Data/Hora, 2 Tipo, 3 Produto, 4 Qtd., 5 Valor Unitário, 6 Valor Total */
+#tMovs th:nth-child(1),
+#tMovs th:nth-child(2),
+#tMovs th:nth-child(3) {
+  text-align: center !important;
+}
+#tMovs th:nth-child(4),
+#tMovs th:nth-child(5),
+#tMovs th:nth-child(6) {
+  text-align: right !important;
+}
+
+
+/* ==== Apenas centralizar os títulos das colunas ==== */
+#tEstado th, #tMovs th {
+  text-align: center !important;
+}
+
+
+/* ==== Cabeçalhos maiores e hover nas linhas de dados ==== */
+/* Títulos das colunas maiores (mantendo centralização já aplicada) */
+#tEstado th, #tMovs th {
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+}
+
+/* Suavizar a transição de fundo nas células */
+#tEstado td, #tMovs td {
+  transition: background .15s ease-in-out;
+}
+
+/* Hover na linha inteira (todas as células) para melhor leitura */
+#tEstado tbody tr:hover td,
+#tMovs tbody tr:hover td {
+  background: rgba(0,0,0,0.06) !important; /* leve destaque sobre branco/zebra */
+}
+
+
+/* ==== Correção: títulos centralizados + maiores, hover em linhas ==== */
+/* Títulos das colunas centralizados e maiores */
+#tEstado th, #tMovs th {
+  text-align: center !important;
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+}
+
+/* Hover nas linhas de dados das duas tabelas */
+#tEstado tbody tr:hover td,
+#tMovs tbody tr:hover td {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+  cursor: pointer;
+  transition: background-color .2s ease-in-out;
+}
+
+
+/* ==== Correção definitiva: cabeçalhos centralizados + hover nos dados ==== */
+/* Centralizar E aumentar os títulos das colunas das DUAS tabelas */
+table:has(#tEstado) thead th,
+table:has(#tMovs) thead th {
+  text-align: center !important;
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+}
+
+/* Hover em TODOS os dados (células) das duas tabelas */
+table:has(#tEstado) tbody td,
+table:has(#tMovs) tbody td {
+  transition: background .15s ease-in-out;
+}
+
+/* Destaque na linha inteira ao passar o mouse */
+table:has(#tEstado) tbody tr:hover td,
+table:has(#tMovs) tbody tr:hover td {
+  background: rgba(0,0,0,0.06) !important;
+}
+
+/* Destaque um pouco mais forte na célula específica sob o mouse */
+table:has(#tEstado) tbody td:hover,
+table:has(#tMovs) tbody td:hover {
+  background: rgba(0,0,0,0.10) !important;
+}
+
+
+/* ==== Espaço + Hover visível com sombra não-preta ==== */
+/* Espaço reforçado entre o título e a tabela do Estado Atual */
+#secEstadoAtual .section-title { margin-bottom: 2rem !important; }
+
+/* Sombra colorida (azul) em vez de preta para cards */
+.card { box-shadow: 0 2px 6px rgba(0, 123, 255, 0.18) !important; }
+.card:hover { box-shadow: 0 8px 20px rgba(0, 123, 255, 0.28) !important; transform: translateY(-2px); }
+
+/* Linhas das tabelas com drop-shadow azul (não preto) */
+#tEstado tr, #tMovs tr { filter: drop-shadow(0 2px 6px rgba(0, 123, 255, 0.18)) !important; }
+#tEstado tr:hover, #tMovs tr:hover { filter: drop-shadow(0 8px 18px rgba(0, 123, 255, 0.28)) !important; }
+
+/* Hover MUITO visível nas células: azul clarinho */
+#tEstado tbody tr:hover td, #tMovs tbody tr:hover td { background: #eaf4ff !important; }
+#tEstado tbody td:hover, #tMovs tbody td:hover { background: #d9ecff !important; }
+
+
+/* ==== Efeitos nos títulos dos cards ==== */
+.section-title {
+  position: relative;
+  text-align: center;
+}
+.section-title::after {
+  content: "";
+  display: block;
+  height: 3px;
+  width: 64px;
+  margin: .4rem auto 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #66b2ff, #a88bff);
+  transform: scaleX(0.9);
+  transition: transform .2s ease-in-out, opacity .2s ease-in-out;
+  opacity: .85;
+}
+.section-title:hover::after {
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+/* ==== Título do site (header) com estilo diferenciado ==== */
+header.topbar h1 {
+  font-size: 2.15rem;
+  font-weight: 800;
+  letter-spacing: .5px;
+  margin: 0;
+  background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 2px 12px rgba(58,123,213,.25);
+}
+
+/* Layout da barra topo + filtros na mesma linha */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+section.filtros .field { margin-right: .5rem; }
+section.filtros .top-actions {
+  margin-left: auto; /* empurra pro fim da linha */
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+section.filtros .top-actions .limite {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+}
+section.filtros .top-actions label { white-space: nowrap; }
+section.filtros .top-actions #limiteBaixa { width: 5rem; }
+
+
+/* ==== Centralizar o nome do produto nos cards ==== */
+#listaProdutos .card .card-header > div:first-child { flex: 1 1 auto; }
+#listaProdutos .card .card-header .title {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-weight: 700;
+}
+
+
+/* ==== Linha de filtros com ações no final ==== */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+section.filtros .field { margin-right: .5rem; }
+section.filtros #aplicarFiltros { margin-right: .5rem; }
+section.filtros .top-actions { margin-left: auto; display: flex; align-items: center; gap: .75rem; }
+section.filtros .top-actions .limite { display: inline-flex; align-items: center; gap: .4rem; }
+section.filtros .top-actions #limiteBaixa { width: 5rem; }
+
+/* ==== Nome do produto centralizado e com destaque ==== */
+#listaProdutos .card .card-header > div:first-child { flex: 1 1 auto; }
+#listaProdutos .card .title {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-weight: 800;
+  font-size: 1.2rem;
+  position: relative;
+}
+#listaProdutos .card .title::after {
+  content: "";
+  display: block;
+  height: 2px;
+  width: 48px;
+  margin: .25rem auto 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #66b2ff, #a88bff);
+  opacity: .9;
+}
+
+
+/* ==== Centralizar o título do site ==== */
+header.topbar, header {
+  display: block;
+}
+header.topbar h1, header h1 {
+  text-align: center !important;
+  margin: 0.5rem 0 0.5rem;
+}
+
+/* ==== Filtros: ações ao lado do Aplicar ==== */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+section.filtros .field { margin-right: .25rem; }
+section.filtros #aplicarFiltros { margin-right: .25rem; }
+section.filtros .top-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  margin-left: 0; /* colado ao Aplicar */
+}
+section.filtros .top-actions .limite { display: inline-flex; align-items: center; gap: .4rem; }
+section.filtros .top-actions #limiteBaixa { width: 4.5rem; }
+
+
+/* ==== Botão + Novo Produto em verde com ícone ==== */
+#abrirNovoProduto.btn.success {
+  background: #2e7d32 !important;   /* green 800 */
+  border-color: #2e7d32 !important;
+  color: #ffffff !important;
+}
+#abrirNovoProduto.btn.success:hover {
+  background: #1b5e20 !important;   /* green 900 */
+  box-shadow: 0 6px 16px rgba(46,125,50,0.35);
+  transform: translateY(-1px);
+}
+
+/* ==== Tabelas sem sombra (sombra transparente) ==== */
+#tEstado tr, #tMovs tr { 
+  filter: none !important;                 /* remove drop-shadow */
+  box-shadow: none !important;             /* caso exista box-shadow antigo */
+}
+/* Mantém hover visível apenas pela cor de fundo, não por sombra */
+#tEstado tbody tr:hover td, #tMovs tbody tr:hover td { 
+  background: #eaf4ff !important;          /* azul clarinho do hover */
+}
+#tEstado tbody td:hover, #tMovs tbody td:hover {
+  background: #d9ecff !important;
+}
+
+
+/* ==== Ícone ➕ mais visível no botão verde ==== */
+#abrirNovoProduto.btn.success {
+  background: #2e7d32 !important;
+  border-color: #2e7d32 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+#abrirNovoProduto.btn.success .icon {
+  font-size: 1.35em;
+  margin-right: .4rem;
+  line-height: 1;
+  vertical-align: -2px;
+  color: #ffffff;
+  -webkit-text-stroke: 0.6px rgba(0,0,0,0.35);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+}
+#abrirNovoProduto.btn.success:hover {
+  background: #1b5e20 !important;
+  box-shadow: 0 6px 16px rgba(46,125,50,0.35);
+  transform: translateY(-1px);
+}
+
+
+/* ==== Mesmo efeito do '+ Novo Produto' para Salvar e Aplicar ==== */
+#salvarLimite.btn, #aplicarFiltros.btn {
+  background: #1976d2 !important;   /* azul primário */
+  border-color: #1976d2 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  transition: transform .2s ease-in-out, box-shadow .2s ease-in-out;
+}
+#salvarLimite.btn:hover, #aplicarFiltros.btn:hover {
+  background: #0d47a1 !important;   /* hover mais escuro */
+  box-shadow: 0 6px 16px rgba(25,118,210,0.35);
+  transform: translateY(-1px);
+}
+
+
+/* ==== Input menor para 'Limite de estoque baixo' ==== */
+#limiteBaixa {
+  width: 3.25rem !important;   /* ~52px */
+  height: 1.9rem !important;
+  font-size: .9rem !important;
+  padding: .2rem .35rem !important;
+  text-align: center !important;
+}
+
+
+/* ==== 'Nome do produto' em fundo branco ==== */
+#buscar { background: #ffffff !important; color: #000000 !important; border: 1px solid #d0d7de !important; border-radius: 8px !important; padding: .45rem .6rem !important; height: 2.1rem; box-shadow: none !important; }
+#buscar::placeholder { color: #6b7280; }
+/* Remover bg do autofill que pode amarelar no Chrome */
+#buscar:-webkit-autofill { -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important; -webkit-text-fill-color: #000000 !important; }
+
+
+/* ==== Ajuste: largura e borda do campo de busca (#buscar) ==== */
+#buscar {
+  width: 20rem !important;   /* ~320px */
+  max-width: 100% !important;
+  border-radius: 12px !important;
+}
+
+
+/* ==== #buscar menor e mais harmonioso ==== */
+#buscar {
+  width: 16rem !important;   /* ~256px */
+  max-width: 100% !important;
+  height: 1.9rem !important;
+  padding: .3rem .55rem !important;
+  border-radius: 10px !important;
+  font-size: .95rem !important;
+  border: 1px solid #d0d7de !important;
+}
+#buscar::placeholder {
+  color: #8893a0;
+}
+#buscar:focus {
+  outline: 0;
+  border-color: #90caf9 !important;
+  box-shadow: 0 0 0 3px rgba(25,118,210,0.15);
+}
+
+
+/* ==== Alinhar altura do #buscar com os botões (na linha de filtros) ==== */
+section.filtros #buscar {
+  height: 32px !important;         /* igual à altura típica do .btn (8px + 16px + 8px) */
+  padding: 0 10px !important;       /* padding horizontal; sem padding vertical para bater a altura */
+  box-sizing: border-box !important;
+  border-radius: 10px !important;
+  font-size: .95rem !important;
+}
+
+
+/* ==== Alinhar altura do input #limiteBaixa com os botões ==== */
+section.filtros #limiteBaixa {
+  height: 32px !important;
+  padding: 0 8px !important;
+  box-sizing: border-box !important;
+  border-radius: 10px !important;
+  font-size: .95rem !important;
+  vertical-align: middle !important;
+}
+
+
+/* ==== Unificar tamanho de fonte: buscar, limite e botões ==== */
+section.filtros #buscar,
+section.filtros #limiteBaixa,
+section.filtros .btn {
+  font-size: .95rem !important;
+  font-family: inherit !important;
+}
+
+
+/* ==== Espaço maior entre o título e a barra de filtros ==== */
+section.filtros {
+  margin-top: 2.25rem !important; /* antes de ~0, agora com respiro maior */
+}
+
+
+/* ==== Espaço AINDA maior entre o título e a barra de filtros ==== */
+section.filtros { margin-top: 3rem !important; }
+
+
+/* ==== Espaço maior (4.5rem) entre o título e a barra de filtros ==== */
+section.filtros { margin-top: 4.5rem !important; }
+
+
+/* ==== Underline ocupa exatamente a largura do texto ==== */
+/* Títulos das seções (ex.: 🛒 Produtos) */
+.section-title {
+  display: block !important;
+  width: -moz-fit-content !important;
+  width: fit-content !important;   /* contrai para o texto */
+  margin-left: auto !important;
+  margin-right: auto !important;   /* centraliza o bloco */
+}
+.section-title::after {
+  width: 100% !important;          /* linha acompanha 100% do texto */
+}
+
+/* Nome do produto dentro do card */
+#listaProdutos .card .card-header > div:first-child { text-align: center !important; }
+#listaProdutos .card .title {
+  display: inline-block !important; /* contrai para o texto */
+  width: auto !important;
+}
+#listaProdutos .card .title::after {
+  width: 100% !important;          /* linha acompanha 100% do nome */
+}
+
+
+/* ==== Barra de filtros no estilo da imagem ==== */
+
+/* Linha de filtros com itens lado a lado */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+/* Input de busca já está branco — mantemos */
+
+/* Select "Quantidade" como pill branco com caret */
+section.filtros select#ordenarPor {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background: #ffffff no-repeat right 12px center;
+  color: #111827;
+  border: 1px solid #d0d7de;
+  border-radius: 12px;
+  height: 32px;
+  padding: 0 36px 0 12px;
+  box-shadow: 0 6px 18px rgba(25,118,210,0.15);
+  position: relative;
+}
+/* caret via background SVG */
+section.filtros select#ordenarPor {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2321273B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+}
+
+/* Botão Aplicar com leve glow para combinar */
+section.filtros #aplicarFiltros.btn {
+  box-shadow: 0 6px 16px rgba(25,118,210,0.28);
+}
+
+/* Grupo à direita com fundo escuro arredondado (Limite + Salvar + Novo) */
+section.filtros .top-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  background: rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: .5rem .75rem;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07);
+}
+section.filtros .top-actions .limite {
+  display: inline-flex; align-items: center; gap: .4rem;
+}
+section.filtros #limiteBaixa {
+  background: #ffffff; color: #111827;
+  border: 1px solid #d0d7de; border-radius: 10px;
+  height: 32px; padding: 0 8px; width: 3.25rem;
+}
+
+/* Botão Salvar (azul) e Novo (verde) já com efeitos; manter alinhados */
+section.filtros #salvarLimite.btn { box-shadow: 0 6px 16px rgba(25,118,210,0.28); }
+section.filtros #abrirNovoProduto.btn.success { box-shadow: 0 6px 16px rgba(46,125,50,0.28); }
+
+/* ➕ roxo para contrastar com o verde */
+#abrirNovoProduto.btn.success .icon {
+  color: #b388ff;
+  -webkit-text-stroke: 0.6px rgba(0,0,0,0.35);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+}
+
+
+/* ==== 'Aplicar' ao lado do campo de busca + reduzir a caixinha ==== */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+/* Ordem desejada: Buscar (1) -> Aplicar (2) -> Select (3) -> Ações (4) */
+section.filtros #buscar { order: 1; width: 14rem !important; max-width: 100% !important; }
+section.filtros #aplicarFiltros { order: 2; margin-left: 0 !important; }
+section.filtros select#ordenarPor { order: 3; }
+section.filtros .top-actions { order: 4; margin-left: auto; }
+
+
+/* ==== Ordem desejada na barra de filtros ==== */
+/* Buscar -> Aplicar -> Quantidade -> (Limite/Salvar/➕ Novo) */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+section.filtros #buscar { order: 1; }
+section.filtros #aplicarFiltros { order: 2; margin-left: 0 !important; }
+section.filtros select#ordenarPor { order: 3; }
+section.filtros .top-actions { order: 4; margin-left: 0 !important; }
+
+
+/* ==== Forçar 'Aplicar' entre a caixinha de busca e o filtro de quantidade ==== */
+section.filtros { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+/* Identifica os wrappers .field pelo conteúdo e aplica a ordem */
+section.filtros .field:has(#buscar)       { order: 1; }
+section.filtros #aplicarFiltros           { order: 2; margin-left: 0 !important; }
+section.filtros .field:has(#ordenarPor)   { order: 3; }
+section.filtros .top-actions              { order: 4; margin-left: 0 !important; }
+/* Mantém a caixinha de busca menor e harmoniosa */
+section.filtros .field:has(#buscar) #buscar { width: 14rem !important; }
+
+
+/* ==== Harmonia da barra de filtros: tamanhos, disposição e efeitos uniformes ==== */
+/* Ordem: Buscar -> Aplicar -> Quantidade -> (Limite/Salvar/➕ Novo) */
+section.filtros { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+section.filtros .field:has(#buscar)     { order:1; }
+section.filtros #aplicarFiltros         { order:2; margin-left:0 !important; }
+section.filtros .field:has(#ordenarPor) { order:3; }
+section.filtros .top-actions            { order:4; margin-left:0 !important; }
+
+/* Alturas e bordas uniformes */
+section.filtros #buscar,
+section.filtros select#ordenarPor,
+section.filtros #limiteBaixa,
+section.filtros .btn {
+  height: 34px !important;
+  border-radius: 14px !important;
+}
+
+/* Larguras e paddings equilibrados */
+section.filtros #buscar {
+  width: 12.5rem !important; /* menor e mais equilibrado */
+  max-width: 100% !important;
+  padding: 0 10px !important;
+  box-sizing: border-box !important;
+}
+section.filtros select#ordenarPor {
+  min-width: 9.5rem !important;
+  padding: 0 36px 0 12px !important;
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background: #ffffff no-repeat right 12px center;
+  border: 1px solid #d0d7de;
+  box-shadow: 0 4px 12px rgba(25,118,210,0.15);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2321273B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+}
+section.filtros #limiteBaixa {
+  width: 3.1rem !important;
+  padding: 0 8px !important;
+  text-align: center !important;
+  border: 1px solid #d0d7de;
+  background: #ffffff;
+}
+
+/* Grupo à direita bem próximo do select e com tamanho contido */
+section.filtros .top-actions {
+  display: inline-flex; align-items:center; gap:.5rem;
+  padding: .4rem .6rem;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.06);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07);
+}
+
+/* Efeitos uniformes (transição/elevação) para todos os controles */
+section.filtros .btn,
+section.filtros select#ordenarPor,
+section.filtros #buscar,
+section.filtros #limiteBaixa {
+  transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease, background-color .2s ease;
+}
+section.filtros .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+}
+section.filtros select#ordenarPor:focus,
+section.filtros #buscar:focus,
+section.filtros #limiteBaixa:focus {
+  outline: 0;
+  border-color: #90caf9;
+  box-shadow: 0 0 0 3px rgba(25,118,210,0.15);
+}
+
+
+/* ==== Colocar 'Aplicar' entre a busca e o filtro de Quantidade ==== */
+section.filtros { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+section.filtros .field:has(#buscar)   { order:1; }
+section.filtros #aplicarFiltros       { order:2; margin:0 !important; }
+section.filtros .field:has(#ordenarPor){ order:3; }
+section.filtros .top-actions          { order:4; margin:0 !important; display:flex; align-items:center; gap:.5rem; }
+
+/* ==== Em .top-actions, deixar Salvar e +Novo coladinhos ao lado do select ==== */
+section.filtros .top-actions .limite { order:1; }
+section.filtros .top-actions #salvarLimite { order:2; }
+section.filtros .top-actions #abrirNovoProduto { order:3; }  /* bloco 'Limite de estoque baixo: [ ]' vai por último */
+
+/* Alturas e bordas iguais para harmonizar */
+section.filtros #aplicarFiltros,
+section.filtros #abrirNovoProduto,
+section.filtros #salvarLimite,
+section.filtros #buscar,
+section.filtros #limiteBaixa,
+section.filtros #ordenarPor {
+  height: 34px !important;
+  border-radius: 14px !important;
+}
+
+/* ==== Reduzir as 'caixinhas' de formulários (nome, quantidade, data da compra etc) fora da barra de filtros ==== */
+body :not(section.filtros) input[type="text"],
+body :not(section.filtros) input[type="number"],
+body :not(section.filtros) input[type="date"],
+body :not(section.filtros) select {
+  height: 32px;
+  border-radius: 10px;
+  padding: 0 .5rem;
+  max-width: 14rem;        /* menor e consistente */
+  box-sizing: border-box;
+}
+
+
+/* ==== Filtros logo abaixo de 'Produtos', alinhado à esquerda ==== */
+section.filtros {
+  justify-content: flex-start !important;
+  margin-top: 2.2rem !important; /* ~duas linhas */
+}
+
+
+/* ==== Centralização perfeita dentro das "bolinhas" (pill buttons) ==== */
+section.filtros #aplicarFiltros.btn,
+section.filtros #salvarLimite.btn,
+section.filtros #abrirNovoProduto.btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: .4rem;
+  height: 36px !important;        /* altura um pouco maior para centralizar melhor */
+  padding: 0 14px !important;      /* sem padding vertical; centraliza no eixo Y */
+  line-height: 1 !important;
+  border-radius: 999px !important; /* "bolinha" / pill perfeita */
+  vertical-align: middle !important;
+}
+
+/* Ajuste fino do ícone ➕ dentro do botão verde */
+#abrirNovoProduto.btn .icon {
+  display: inline-block;
+  line-height: 1;
+  margin-right: .35rem;
+  transform: translateY(0);        /* zera qualquer deslocamento */
+}
+
+
+/* ==== Filtros sob 'Produtos' e antes dos cards ==== */
+section.filtros {
+  justify-content: flex-start !important;
+  margin-top: 1.25rem !important;
+  margin-bottom: 1rem !important;
+}
+
+
+/* ==== Centralizar os nomes 'Buscar' e 'Filtrar' acima das caixinhas ==== */
+section.filtros .field label[for="buscar"],
+section.filtros .field label[for="ordenarPor"] {
+  display: block;
+  width: 100%;
+  text-align: center !important;
+  margin-bottom: .3rem;
+}
+
+
+/* ==== Igualar as duas caixinhas: Buscar e Filtrar ==== */
+section.filtros #buscar,
+section.filtros select#ordenarPor {
+  height: 36px !important;
+  border-radius: 14px !important;
+  box-sizing: border-box !important;
+  font-size: .95rem !important;
+}
+/* Padding específico para cada controle */
+section.filtros #buscar {
+  padding: 0 12px !important;
+  background-color: #ffffff !important;
+  border: 1px solid #d0d7de !important;
+}
+section.filtros select#ordenarPor {
+  padding: 0 36px 0 12px !important; /* preserva espaço da setinha */
+  border: 1px solid #d0d7de !important;
+}
+
+
+/* ==== Título '📦 Controle de Estoque' com mais efeito e enfoque ==== */
+header.topbar h1, header h1 {
+  position: relative;
+  text-align: center !important;
+  margin: 0.5rem 0 0.75rem;
+  font-weight: 900;
+  letter-spacing: .4px;
+  background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 3px 18px rgba(58,123,213,.35);
+}
+/* Barra sutil abaixo do título com animação de foco */
+header.topbar h1::after, header h1::after {
+  content: "";
+  display: block;
+  height: 4px;
+  width: 84px;
+  margin: .5rem auto 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(0,210,255,.9), rgba(58,123,213,.9));
+  box-shadow: 0 6px 22px rgba(58,123,213,.25);
+  transform: scaleX(.9);
+  transition: transform .25s ease, opacity .25s ease;
+  opacity: .9;
+}
+header.topbar h1:hover::after, header h1:hover::after {
+  transform: scaleX(1);
+  opacity: 1;
+}
+/* Brilho discreto que percorre o título ao focar/hover */
+@keyframes title-shine { 
+  0% { background-position: -200% 0; } 
+  100% { background-position: 200% 0; } 
+}
+header.topbar h1:hover, header h1:hover {
+  background-image: linear-gradient(90deg, #00d2ff, #3a7bd5, #00d2ff);
+  background-size: 200% auto;
+  animation: title-shine 1.2s linear 1;
+}
+
+/* ==== Filtros: todos na MESMA linha das caixinhas brancas ==== */
+/* Ordem: Buscar -> Aplicar -> Filtrar (Quantidade) -> [Limite / 5 / Salvar / ➕ Novo] */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: nowrap;                 /* força em uma linha (desktop) */
+}
+@media (max-width: 900px) {
+  section.filtros { flex-wrap: wrap; }  /* responsivo: pode quebrar */
+}
+section.filtros .field:has(#buscar)     { order: 1; }
+section.filtros #aplicarFiltros         { order: 2; }
+section.filtros .field:has(#ordenarPor) { order: 3; }
+section.filtros .top-actions            { order: 4; margin-left: 0 !important; display: inline-flex; align-items: center; gap: .5rem; }
+
+/* Alturas, raios e tipografia iguais para todos */
+section.filtros #buscar,
+section.filtros select#ordenarPor,
+section.filtros #limiteBaixa,
+section.filtros .btn {
+  height: 36px !important;
+  border-radius: 14px !important;
+  font-size: .95rem !important;
+}
+
+/* Geometrias e paddings */
+section.filtros #buscar {
+  background: #fff; border: 1px solid #d0d7de;
+  padding: 0 12px; width: 12.5rem; max-width: 100%;
+}
+section.filtros select#ordenarPor {
+  min-width: 10.5rem;
+  padding: 0 36px 0 12px;
+  -webkit-appearance:none; -moz-appearance:none; appearance:none;
+  background: #fff no-repeat right 12px center;
+  border: 1px solid #d0d7de;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2321273B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+}
+section.filtros #limiteBaixa {
+  width: 3.1rem; padding: 0 8px; text-align: center;
+  background: #fff; border: 1px solid #d0d7de;
+}
+
+/* Centralização perfeita nas "bolinhas" dos botões */
+section.filtros #aplicarFiltros.btn,
+section.filtros #salvarLimite.btn,
+section.filtros #abrirNovoProduto.btn {
+  display:inline-flex; align-items:center; justify-content:center;
+  padding: 0 14px; line-height:1; border-radius:999px !important;
+}
+
+
+/* ==== Aplicar + (Limite / Salvar / ➕) na MESMA linha das caixinhas brancas ==== */
+section.filtros {
+  display: flex;
+  flex-wrap: nowrap;            /* tudo numa linha (desktop) */
+  align-items: flex-end;        /* alinha pela base das caixinhas */
+  gap: .6rem;
+}
+@media (max-width: 900px) {
+  section.filtros { flex-wrap: wrap; } /* responsivo, pode quebrar em telas pequenas */
+}
+
+/* Fields com label em cima e caixa embaixo */
+section.filtros .field {
+  display: flex;
+  flex-direction: column;
+}
+section.filtros .field label {
+  margin-bottom: .3rem;
+}
+
+/* Botões e grupo da direita alinhados à base dos campos */
+section.filtros #aplicarFiltros,
+section.filtros .top-actions {
+  align-self: flex-end;
+  margin-top: 0 !important;
+}
+
+/* Ordem: Buscar -> Aplicar -> Filtrar -> Grupo Direita */
+section.filtros .field:has(#buscar)     { order: 1; }
+section.filtros #aplicarFiltros         { order: 2; }
+section.filtros .field:has(#ordenarPor) { order: 3; }
+section.filtros .top-actions            { order: 4; }
+
+
+/* ==== Filtros: SEM QUEBRA (sempre uma linha) ==== */
+section.filtros {
+  display: flex;
+  flex-wrap: nowrap !important;   /* nunca quebrar */
+  align-items: flex-end;          /* alinha pela base dos campos */
+  gap: .6rem;
+  overflow-x: auto;               /* caso não caiba, scroll horizontal */
+  -webkit-overflow-scrolling: touch;
+}
+
+
+/* ==== Tudo na MESMA linha: Buscar | Aplicar | Filtrar | Limite / 5 / Salvar / ➕ ==== */
+section.filtros {
+  display: flex !important;
+  align-items: flex-end !important;  /* alinha pela base (labels acima, caixas abaixo) */
+  flex-wrap: nowrap !important;      /* nunca quebrar de linha */
+  gap: .6rem !important;
+  overflow-x: auto;                  /* se não couber, scroll horizontal */
+  -webkit-overflow-scrolling: touch;
+}
+/* Cada bloco não deve quebrar */
+section.filtros .field,
+section.filtros #aplicarFiltros,
+section.filtros .top-actions {
+  flex: 0 0 auto !important;        /* não encolher a ponto de quebrar */
+  white-space: nowrap !important;
+}
+
+/* Grupo da direita SEM quebra interna */
+section.filtros .top-actions {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: .5rem !important;
+  margin-left: 0 !important;
+}
+section.filtros .top-actions .limite {
+  display: flex !important;
+  align-items: center !important;
+  gap: .4rem !important;
+  white-space: nowrap !important;
+}
+section.filtros .top-actions .limite label {
+  display: inline-block !important;
+  margin: 0 !important;
+}
+/* Evita qualquer <br> acidental afetar layout (apenas segurança) */
+section.filtros .top-actions br { display: none !important; }
+
+
+/* ==== Select auto-ajustado ao texto + direcionais ▲ ▼ ==== */
+section.filtros .field:has(#ordenarPor) { position: relative; }
+
+section.filtros select#ordenarPor {
+  width: auto !important;        /* ajusta à largura do texto */
+  min-width: 0 !important;
+  padding-right: 42px !important;/* espaço para ▲ ▼ */
+  background-image: none !important; /* removemos a setinha extra para não poluir */
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+}
+
+section.filtros .dir-arrows {
+  position: absolute;
+  right: 8px;
+  top: calc(50% - 16px);
+  width: 26px;
+  height: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: auto;
+}
+
+section.filtros .dir-arrows .dir-up,
+section.filtros .dir-arrows .dir-down {
+  width: 100%;
+  height: 14px;
+  line-height: 14px;
+  font-size: 11px;
+  background: transparent;
+  color: #374151;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color .15s ease;
+}
+section.filtros .dir-arrows .dir-up:hover,
+section.filtros .dir-arrows .dir-down:hover {
+  background-color: rgba(0,0,0,0.06);
+}
+section.filtros .dir-arrows .active {
+  background-color: rgba(25,118,210,0.15);
+}
+
+/* Mantém tudo numa linha (já aplicado antes), reforço aqui */
+section.filtros { flex-wrap: nowrap !important; }
+
+
+/* ==== Botões 'Cancelar' com fundo vermelho ==== */
+#fecharModalProduto.btn,
+#fecharModalAcoes.btn,
+.btn.cancel {
+  background: #c62828 !important;   /* red 800 */
+  border-color: #c62828 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 14px;
+  line-height: 1;
+  border-radius: 999px; /* pill */
+  transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease;
+}
+#fecharModalProduto.btn:hover,
+#fecharModalAcoes.btn:hover,
+.btn.cancel:hover {
+  background: #b71c1c !important;   /* darker red */
+  box-shadow: 0 8px 20px rgba(198,40,40,0.35);
+  transform: translateY(-1px);
+}
+
+
+/* ==== Top-actions alinhado exatamente à altura da caixinha de 'Filtrar' ==== */
+section.filtros { align-items: flex-end !important; flex-wrap: nowrap !important; }
+
+/* Seletores e inputs com altura padronizada */
+section.filtros #buscar,
+section.filtros select#ordenarPor,
+section.filtros #limiteBaixa,
+section.filtros .btn {
+  height: 36px !important;
+}
+
+/* Grupo da direita no MESMO nível da caixa de 'Filtrar' */
+section.filtros .top-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  height: 36px !important;
+  gap: .5rem !important;
+  white-space: nowrap !important;
+  padding: 0 .6rem !important;
+  margin: 0 !important;
+  align-self: flex-end !important;      /* alinha pela base das caixas */
+}
+
+/* Subgrupo 'Limite' sem quebrar e centrado verticalmente */
+section.filtros .top-actions .limite {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: .4rem !important;
+  height: 36px !important;
+  white-space: nowrap !important;
+  margin: 0 !important;
+}
+
+/* Evitar quebras internas e <br> acidentais */
+section.filtros .top-actions br { display: none !important; }
+
+
+/* ==== Filtrar com setas internas (estilo spinner) como 'Limite' ==== */
+section.filtros .field:has(#ordenarPor) { position: relative; }
+
+/* Select: caixa branca padrão */
+section.filtros select#ordenarPor {
+  background-color: #ffffff !important;
+  border: 1px solid #d0d7de !important;
+  border-radius: 14px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  padding: 0 42px 0 12px !important; /* espaço para setas */
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background-image: none !important;  /* sem caret extra */
+}
+
+/* Container das setas acoplado ao lado direito do select */
+section.filtros .dir-arrows {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 32px;
+  height: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid #d0d7de;
+  background: #ffffff;
+  border-top-right-radius: 14px;
+  border-bottom-right-radius: 14px;
+  overflow: hidden; /* bordas arredondadas */
+}
+
+/* Botões das setas */
+section.filtros .dir-arrows .dir-up,
+section.filtros .dir-arrows .dir-down {
+  width: 100%;
+  height: 18px;
+  line-height: 18px;
+  font-size: 11px;
+  background: transparent;
+  color: #374151;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+section.filtros .dir-arrows .dir-up:hover,
+section.filtros .dir-arrows .dir-down:hover {
+  background-color: rgba(0,0,0,0.06);
+}
+section.filtros .dir-arrows .active {
+  background-color: rgba(25,118,210,0.15);
+}
+
+/* Garantir que nada quebre a linha dos filtros */
+section.filtros { flex-wrap: nowrap !important; }
+
+
+/* ==== Select 'Filtrar' como caixinha seletora que ajusta à opção atual ==== */
+section.filtros .field:has(#ordenarPor) { position: relative; }
+
+section.filtros select#ordenarPor {
+  background-color: #ffffff !important;
+  border: 1px solid #d0d7de !important;
+  border-radius: 14px !important;
+  height: 36px !important;
+  padding: 0 28px 0 12px !important; /* espaço para caret */
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background: #ffffff no-repeat right 10px center;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2321273B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  width: auto !important;      /* deixa o JS definir com precisão */
+  min-width: unset !important;
+}
+
+/* Segurança: esconda qualquer resto de .dir-arrows */
+section.filtros .dir-arrows { display: none !important; }
+
+
+/* ==== Filtrar: seletor com direcionais internos (igual ao 'Limite') e auto-ajuste ==== */
+section.filtros .field:has(#ordenarPor) { position: relative; }
+
+section.filtros select#ordenarPor {
+  background-color: #ffffff !important;
+  border: 1px solid #d0d7de !important;
+  border-radius: 14px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  padding: 0 42px 0 12px !important; /* espaço reservado para as setas */
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background-image: none !important;  /* sem caret extra */
+  width: auto !important;             /* JS define o width */
+  min-width: unset !important;
+}
+
+/* Container das setas (área direita do select) */
+section.filtros .dir-arrows {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 32px;
+  height: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid #d0d7de;
+  background: #ffffff;
+  border-top-right-radius: 14px;
+  border-bottom-right-radius: 14px;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+/* Botões ▲ ▼ */
+section.filtros .dir-arrows .dir-up,
+section.filtros .dir-arrows .dir-down {
+  width: 100%;
+  height: 18px;
+  line-height: 18px;
+  font-size: 11px;
+  background: transparent;
+  color: #374151;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+section.filtros .dir-arrows .dir-up:hover,
+section.filtros .dir-arrows .dir-down:hover {
+  background-color: rgba(0,0,0,0.06);
+}
+section.filtros .dir-arrows .active { background-color: rgba(25,118,210,0.15); }
+
+/* Garantir uma única linha */
+section.filtros { flex-wrap: nowrap !important; }
+
+
+/* ==== FIX: select 'Filtrar' auto-ajustável (com setas) ==== */
+section.filtros .field:has(#ordenarPor) { position: relative !important; white-space: nowrap !important; }
+section.filtros .field:has(#ordenarPor) * { white-space: nowrap !important; }
+
+section.filtros select#ordenarPor {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  display: inline-block !important;
+  box-sizing: content-box !important;
+  padding-right: 42px !important;  /* espaço para ▲▼ */
+  background-image: none !important;
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+  flex: 0 0 auto !important;
+}
+
+/* Área das setas mantém posição absoluta à direita */
+section.filtros .field:has(#ordenarPor) .dir-arrows {
+  position: absolute !important;
+  top: 0; right: 0;
+  width: 32px; height: 36px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  border-left: 1px solid #d0d7de;
+  background: #ffffff;
+  border-top-right-radius: 14px; border-bottom-right-radius: 14px;
+  pointer-events: auto;
+}
+
+
+/* ==== Botão 'Limpar' ao lado do 'Aplicar' ==== */
+section.filtros #limparBusca.btn {
+  order: 3;
+  background: #1976d2 !important;
+  border-color: #1976d2 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 36px; padding: 0 14px; line-height: 1; border-radius: 999px;
+  transition: transform .2s ease-in-out, box-shadow .2s ease-in-out, background-color .2s ease-in-out;
+}
+section.filtros #limparBusca.btn:hover {
+  background: #0d47a1 !important;
+  box-shadow: 0 6px 16px rgba(25,118,210,0.35);
+  transform: translateY(-1px);
+}
+
+/* Ordering along the row */
+section.filtros .field:has(#buscar)     { order: 1; }
+section.filtros #aplicarFiltros         { order: 2; }
+section.filtros #limparBusca            { order: 3; }
+section.filtros .field:has(#ordenarPor) { order: 4; }
+section.filtros .top-actions            { order: 5; }
+
+
+/* ==== Botão 'Limpar' com fundo laranja ==== */
+section.filtros #limparBusca.btn {
+  background: #ef6c00 !important;   /* orange 800 */
+  border-color: #ef6c00 !important;
+  color: #ffffff !important;
+}
+section.filtros #limparBusca.btn:hover {
+  background: #e65100 !important;   /* darker orange */
+  box-shadow: 0 6px 16px rgba(239,108,0,0.35);
+}
+
+/* ==== Filtrar menor (mantendo alinhamento de altura) ==== */
+section.filtros .field:has(#ordenarPor) { position: relative !important; }
+section.filtros select#ordenarPor {
+  /* mesma altura para alinhar com os outros controles */
+  height: 36px !important;
+  line-height: 36px !important;
+  /* reduzir a largura visual: menos padding e área de setas menor */
+  padding: 0 28px 0 8px !important;    /* antes ~0 42px 0 12px */
+  font-size: 0.92rem !important;       /* ligeiramente menor */
+}
+/* Área das setas mais estreita */
+section.filtros .field:has(#ordenarPor) .dir-arrows {
+  width: 24px !important;              /* antes 32px */
+  height: 36px !important;
+}
+section.filtros .dir-arrows .dir-up,
+section.filtros .dir-arrows .dir-down {
+  height: 16px !important;
+  line-height: 16px !important;
+  font-size: 10px !important;
+}
+
+
+/* ==== Filtrar ainda menor + texto centralizado ==== */
+section.filtros .field:has(#ordenarPor) { position: relative !important; }
+
+section.filtros select#ordenarPor {
+  padding: 0 24px 0 8px !important;   /* menor ainda */
+  font-size: 0.88rem !important;
+  text-align: center !important;
+  text-align-last: center !important;  /* centra o valor selecionado no select */
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+section.filtros .field:has(#ordenarPor) .dir-arrows {
+  width: 20px !important;             /* setas mais estreitas */
+  height: 36px !important;
+}
+section.filtros .dir-arrows .dir-up,
+section.filtros .dir-arrows .dir-down {
+  height: 15px !important;
+  line-height: 15px !important;
+  font-size: 10px !important;
+}
+
+
+/* ==== Centralizar SEMPRE o número do 'Limite de estoque baixo' ==== */
+#limiteBaixa {
+  text-align: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+/* Ajustes de spinners para não deslocar o texto */
+#limiteBaixa::-webkit-outer-spin-button,
+#limiteBaixa::-webkit-inner-spin-button { margin: 0; }
+
+
+/* ==== Centralizar texto no campo 'Nome do produto' (busca) ==== */
+section.filtros #buscar {
+  text-align: center !important;
+}
+section.filtros #buscar::placeholder {
+  text-align: center;
+}
+
+
+/* ==== Forçar centralização do número no 'Limite de estoque baixo' ==== */
+section.filtros .top-actions .limite input#limiteBaixa,
+section.filtros input#limiteBaixa,
+input[type="number"]#limiteBaixa,
+#limiteBaixa {
+  text-align: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  direction: ltr !important;
+}
+#limiteBaixa::placeholder { text-align: center; }
+
+
+/* ==== Número do 'Limite de estoque baixo' sempre em negrito ==== */
+section.filtros .top-actions .limite #limiteBaixa,
+section.filtros #limiteBaixa,
+#limiteBaixa {
+  font-weight: 700 !important;
+}
+
+
+/* ==== Destaque forte para cards com Estoque Baixo ==== */
+#listaProdutos.grid .card.low-stock {
+  border: 2px solid #e53935 !important;
+  box-shadow: 0 10px 28px rgba(229,57,53,0.35), 0 0 0 2px rgba(229,57,53,0.15) inset;
+  transform: translateY(-1px);
+}
+#listaProdutos.grid .card.low-stock .badge.low {
+  background: #e53935;
+  color: #fff;
+  font-weight: 800;
+  border: 0;
+}
+#listaProdutos.grid .card.low-stock .title {
+  color: #ffebee;
+}
+#listaProdutos.grid .card.low-stock .card-header {
+  background: linear-gradient(180deg, rgba(229,57,53,0.22), rgba(229,57,53,0.08));
+  border-bottom: 1px solid rgba(229,57,53,0.25);
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+}
+@keyframes lowStockPulse {
+  0%, 100% { box-shadow: 0 10px 28px rgba(229,57,53,0.25), 0 0 0 2px rgba(229,57,53,0.10) inset; }
+  50% { box-shadow: 0 12px 34px rgba(229,57,53,0.45), 0 0 0 2px rgba(229,57,53,0.20) inset; }
+}
+#listaProdutos.grid .card.low-stock {
+  animation: lowStockPulse 2.6s ease-in-out infinite;
+}
+#listaProdutos.grid .card.low-stock .meta {
+  color: #ffd6d6;
+}
+
+
+/* ==== Ícone de alerta nos cards com estoque baixo ==== */
+#listaProdutos.grid .card { position: relative; }
+#listaProdutos.grid .card .low-flag {
+  position: absolute;
+  top: 6px; right: 6px;
+  font-size: 20px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35));
+  z-index: 2;
+}
+#listaProdutos.grid .card:not(.low-stock) .low-flag { display: none; }
+
+/* ==== 'Limite de estoque baixo:' um pouco maior ==== */
+section.filtros .top-actions .limite label {
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+}
+
+
+#listaProdutos.grid .card .low-flag { display: none !important; }
+#listaProdutos.grid .card .badge.low { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .5rem; border-radius: 999px; }
+
+
+/* === Mostrar ⚠️ dentro do nome 'Estoque baixo' === */
+#listaProdutos .badge.low::before { content: "⚠️ "; }
+
+/* Opcional: destaque visual para cards low-stock (mantém comportamento existente) */
+#listaProdutos .card.low-stock { border-color: #e53935; box-shadow: 0 8px 22px rgba(229,57,53,.28); }
+
+</style>
+
+
+<style>
+/* Flash suave nos cards de produtos ao atualizar */
+@keyframes flash-card { 
+  0% { box-shadow: 0 0 0 0 rgba(76,175,80,.45); background-color: rgba(76,175,80,.08); }
+  100% { box-shadow: 0 0 0 0 transparent; background-color: transparent; }
+}
+.card.flash {
+  animation: flash-card 1.2s ease-in-out 1;
+}
+
+/* Hover effects: sombra e leve elevação para todos os cards/tabelas */
+#tEstado tr:hover,
+#tMovs tr:hover,
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  transform: scale(1.01);
+  transition: all 0.2s ease-in-out;
+  background-color: rgba(255,255,255,0.9);
+}
+
+
+/* Bordas arredondadas para linhas das tabelas, estilo card */
+#tEstado tr,
+#tMovs tr {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+
+/* Espaçamento entre linhas para efeito de cartões separados */
+#tEstado tr,
+#tMovs tr {
+  margin-bottom: 8px;
+  display: block;
+}
+#tEstado,
+#tMovs {
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+
+
+/* Sombra fixa suave em todos os cards/linhas */
+#tEstado tr,
+#tMovs tr,
+.card {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  border-radius: 8px;
+}
+
+
+/* ==== FIX: organização e hover transparente ==== */
+/* Restaurar layout de tabela correto (evitar display:block em <tr>) */
+#tEstado tr, #tMovs tr { display: table-row !important; }
+/* Espaçamento entre linhas via border-spacing (sem quebrar tabela) */
+#tEstado, #tMovs { border-collapse: separate !important; border-spacing: 0 8px !important; }
+/* Bordas arredondadas aplicadas pelos extremos das células */
+#tEstado tr td:first-child, #tMovs tr td:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+#tEstado tr td:last-child,  #tMovs tr td:last-child  { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+/* Sombra fixa suave: usar drop-shadow para evitar glitches em table-row */
+#tEstado tr, #tMovs tr { box-shadow: none !important; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.15)); transition: filter .2s ease-in-out; }
+/* Hover com aumento sutil da sombra, sem alterar background */
+#tEstado tr:hover, #tMovs tr:hover { filter: drop-shadow(0 4px 12px rgba(0,0,0,0.25)); }
+/* Fundo SEMPRE transparente nas linhas (normal e hover) */
+#tEstado tr td, #tMovs tr td { background: transparent !important; }
+/* Cards de produto: manter sombra e hover transparente, sem "branco" */
+.card { box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: box-shadow .2s ease-in-out, transform .2s ease-in-out; background: transparent !important; }
+.card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.25); transform: translateY(-1px); background: transparent !important; }
+/* Remover qualquer escala em linhas de tabela (pode "bagunçar" tabela) */
+#tEstado tr:hover, #tMovs tr:hover { transform: none !important; }
+/* Badge continua igual (fade) */
+
+
+/* ==== Tema-aware hover highlight ==== */
+:root {
+  --shadow-light: 0 2px 6px rgba(0,0,0,0.15);
+  --shadow-strong: 0 4px 12px rgba(0,0,0,0.25);
+  --highlight-border: rgba(33, 150, 243, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shadow-light: 0 2px 6px rgba(0,0,0,0.4);
+    --shadow-strong: 0 4px 12px rgba(0,0,0,0.6);
+    --highlight-border: rgba(33, 150, 243, 0.7);
+  }
+}
+
+/* Aplicação nos elementos */
+#tEstado tr, #tMovs tr, .card {
+  box-shadow: var(--shadow-light);
+  border-radius: 8px;
+  transition: box-shadow .2s ease-in-out, transform .2s ease-in-out, border .2s ease-in-out;
+  background: transparent !important;
+  border: 1px solid transparent;
+}
+
+#tEstado tr:hover, #tMovs tr:hover, .card:hover {
+  box-shadow: var(--shadow-strong);
+  border: 1px solid var(--highlight-border);
+  background: transparent !important;
+}
+
+
+
+
+/* ==== Efeito simples de hover em cards, tabelas e botões ==== */
+.card {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: box-shadow .2s ease-in-out, transform .2s ease-in-out;
+  background: transparent !important;
+}
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  transform: translateY(-1px);
+}
+
+#tEstado tr, #tMovs tr {
+  transition: filter .2s ease-in-out;
+}
+#tEstado tr:hover, #tMovs tr:hover {
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.25));
+}
+
+button, .btn {
+  transition: transform .2s ease-in-out, box-shadow .2s ease-in-out;
+}
+button:hover, .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+}
+
+
+/* ==== Fundo do Estado Atual igual ao Histórico ==== */
+#tEstado tr td {
+  background: #fff !important;
+  transition: background 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+#tEstado tr:hover td {
+  background: #fff !important;
+}
+
+/* Hover mais intenso (sombra maior) para Estado Atual e Histórico */
+#tEstado tr:hover, #tMovs tr:hover, .card:hover, button:hover, .btn:hover {
+  box-shadow: 0 6px 16px rgba(0,0,0,0.35) !important;
+  transform: translateY(-2px);
+}
+
+
+/* ==== Fundo igual ao Histórico + Hover mais forte ==== */
+/* Fundo branco padronizado nas duas tabelas */
+#tEstado tr td,
+#tMovs tr td {
+  background: #ffffff !important;
+  transition: background .2s ease-in-out;
+}
+
+/* Hover mais forte nas linhas */
+#tEstado tr:hover,
+#tMovs tr:hover {
+  filter: drop-shadow(0 8px 22px rgba(0,0,0,0.30)) !important;
+}
+
+/* Cards de produto com hover mais intenso */
+.card:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.28) !important;
+  transform: translateY(-2px);
+}
+
+/* Botões com hover um pouco mais forte para acompanhar */
+button:hover, .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.28);
+}
+
+
+/* ==== Zebra background nas tabelas ==== */
+#tEstado tr:nth-child(even) td,
+#tMovs tr:nth-child(even) td {
+  background: #f8f9fa !important;
+}
+#tEstado tr:nth-child(odd) td,
+#tMovs tr:nth-child(odd) td {
+  background: #ffffff !important;
+}
+
+/* ==== Padronização dos títulos ==== */
+.section-title {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 0.75rem;
+}
+
+
+/* ==== Títulos padronizados ==== */
+.section-title {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2c2c2c;
+  margin: 0 0 .75rem 0;
+}
+
+/* ==== Zebra striping (fundo levemente cinza) ==== */
+#tEstado tr:nth-child(odd) td,
+#tMovs tr:nth-child(odd) td {
+  background: #f8f9fa !important;
+}
+#tEstado tr:nth-child(even) td,
+#tMovs tr:nth-child(even) td {
+  background: #ffffff !important;
+}
+
+
+/* ==== Ajuste dos títulos ==== */
+.section-title {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 1.75rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  margin: 0 0 .75rem 0;
+}
+
+
+/* ==== Títulos com sombra de texto ==== */
+.section-title {
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+}
+
+
+/* ==== Cabeçalhos das tabelas com sombra de texto ==== */
+#tEstado th,
+#tMovs th {
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+  color: #ffffff !important;
+}
+
+
+/* ==== Ajuste final ==== */
+/* Títulos principais */
+.section-title {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 1.75rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+}
+
+/* Cabeçalhos das tabelas */
+#tEstado th,
+#tMovs th {
+  color: #ffffff !important;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+}
+
+/* Dados das tabelas */
+#tEstado td,
+#tMovs td {
+  color: #000000 !important;
+  text-shadow: none !important;
+}
+
+
+/* ==== Títulos das colunas maiores ==== */
+#tEstado th,
+#tMovs th {
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+}
+
+
+/* ==== Espaço extra entre título e tabela ==== */
+#secEstadoAtual .section-title,
+section.historico .section-title {
+  display: block;
+  margin-bottom: 1.5rem !important;
+}
+
+
+/* ==== Espaço extra entre todos os títulos e suas seções ==== */
+#secEstadoAtual .section-title,
+section.historico .section-title,
+section .section-title {
+  display: block;
+  margin-bottom: 1.5rem !important;
+}
+
+
+/* ==== Centralização e espaçamentos extras ==== */
+/* Centralizar todos os títulos */
+.section-title {
+  text-align: center !important;
+}
+
+/* Espaço entre o botão Limpar Histórico e a tabela */
+#limparHistorico {
+  margin-bottom: 1rem !important;
+}
+
+/* Espaço extra acima da seção de Histórico */
+section.historico {
+  margin-top: 2rem !important;
+}
+
+
+/* ==== Centralização e espaçamentos solicitados ==== */
+/* Centralizar todos os títulos */
+.section-title { text-align: center !important; }
+/* Espaço entre o botão Limpar Histórico e a tabela */
+#limparHistorico { margin-bottom: 1rem !important; }
+/* Espaço extra acima da seção de Histórico */
+section.historico { margin-top: 2rem !important; }
+
+
+/* ==== Centralizar títulos das colunas e dados em negrito ==== */
+#tEstado th, #tMovs th { text-align: center !important; }
+#tEstado td, #tMovs td { font-weight: bold !important; }
+
+
+/* ==== Centralizar cabeçalhos e negrito nos dados ==== */
+#tEstado th,
+#tMovs th {
+  text-align: center !important;
+}
+#tEstado td,
+#tMovs td {
+  font-weight: bold !important;
+}
+
+
+/* ==== Espaço extra entre título e tabela do Estado Atual ==== */
+#secEstadoAtual .section-title {
+  display: block;
+  margin-bottom: 1.5rem !important;
+}
+
+
+/* ==== Espaço extra abaixo de todos os títulos ==== */
+.section-title {
+  display: block;
+  margin-bottom: 1.5rem !important;
+}
+
+
+/* ==== Espaçamento extra entre as seções ==== */
+section {
+  margin-bottom: 2.5rem !important;
+}
+
+
+/* ==== Linha divisória entre seções ==== */
+section {
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 1.5rem;
+  margin-bottom: 2.5rem !important;
+}
+
+/* ==== Alinhamento de títulos de colunas ==== */
+/* Centralizar colunas de texto/data */
+#tEstado th:nth-child(1),
+#tEstado th:nth-child(2),
+#tEstado th:nth-child(6),
+#tEstado th:nth-child(7),
+#tMovs th:nth-child(1),
+#tMovs th:nth-child(2),
+#tMovs th:nth-child(3),
+#tMovs th:nth-child(6),
+#tMovs th:nth-child(7) {
+  text-align: center !important;
+}
+
+/* Alinhar numéricos à direita */
+#tEstado th:nth-child(3),
+#tEstado th:nth-child(4),
+#tEstado th:nth-child(5),
+#tMovs th:nth-child(4),
+#tMovs th:nth-child(5) {
+  text-align: right !important;
+}
+
+/* Dados seguem mesmo padrão: centralizar texto/data, alinhar números à direita */
+#tEstado td:nth-child(1),
+#tEstado td:nth-child(2),
+#tEstado td:nth-child(6),
+#tEstado td:nth-child(7),
+#tMovs td:nth-child(1),
+#tMovs td:nth-child(2),
+#tMovs td:nth-child(3),
+#tMovs td:nth-child(6),
+#tMovs td:nth-child(7) {
+  text-align: center !important;
+}
+
+#tEstado td:nth-child(3),
+#tEstado td:nth-child(4),
+#tEstado td:nth-child(5),
+#tMovs td:nth-child(4),
+#tMovs td:nth-child(5) {
+  text-align: right !important;
+}
+
+
+/* ==== Linha divisória sutil entre seções ==== */
+section {
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 1.5rem;
+  margin-bottom: 2.5rem !important;
+}
+
+/* ==== Alinhamento dos títulos por tipo de coluna ==== */
+/* Estado Atual: 1 Atualizado, 2 Produto, 3 Quantidade, 4 Preço, 5 Valor total, 6 Última compra, 7 Última venda */
+#tEstado th:nth-child(1),
+#tEstado th:nth-child(2),
+#tEstado th:nth-child(6),
+#tEstado th:nth-child(7) {
+  text-align: center !important;
+}
+#tEstado th:nth-child(3),
+#tEstado th:nth-child(4),
+#tEstado th:nth-child(5) {
+  text-align: right !important;
+}
+
+/* Histórico: 1 Data/Hora, 2 Tipo, 3 Produto, 4 Qtd., 5 Valor Unitário, 6 Valor Total */
+#tMovs th:nth-child(1),
+#tMovs th:nth-child(2),
+#tMovs th:nth-child(3) {
+  text-align: center !important;
+}
+#tMovs th:nth-child(4),
+#tMovs th:nth-child(5),
+#tMovs th:nth-child(6) {
+  text-align: right !important;
+}
+
+
+/* ==== Apenas centralizar os títulos das colunas ==== */
+#tEstado th, #tMovs th {
+  text-align: center !important;
+}
+
+
+/* ==== Cabeçalhos maiores e hover nas linhas de dados ==== */
+/* Títulos das colunas maiores (mantendo centralização já aplicada) */
+#tEstado th, #tMovs th {
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+}
+
+/* Suavizar a transição de fundo nas células */
+#tEstado td, #tMovs td {
+  transition: background .15s ease-in-out;
+}
+
+/* Hover na linha inteira (todas as células) para melhor leitura */
+#tEstado tbody tr:hover td,
+#tMovs tbody tr:hover td {
+  background: rgba(0,0,0,0.06) !important; /* leve destaque sobre branco/zebra */
+}
+
+
+/* ==== Correção: títulos centralizados + maiores, hover em linhas ==== */
+/* Títulos das colunas centralizados e maiores */
+#tEstado th, #tMovs th {
+  text-align: center !important;
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+}
+
+/* Hover nas linhas de dados das duas tabelas */
+#tEstado tbody tr:hover td,
+#tMovs tbody tr:hover td {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+  cursor: pointer;
+  transition: background-color .2s ease-in-out;
+}
+
+
+/* ==== Correção definitiva: cabeçalhos centralizados + hover nos dados ==== */
+/* Centralizar E aumentar os títulos das colunas das DUAS tabelas */
+table:has(#tEstado) thead th,
+table:has(#tMovs) thead th {
+  text-align: center !important;
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+}
+
+/* Hover em TODOS os dados (células) das duas tabelas */
+table:has(#tEstado) tbody td,
+table:has(#tMovs) tbody td {
+  transition: background .15s ease-in-out;
+}
+
+/* Destaque na linha inteira ao passar o mouse */
+table:has(#tEstado) tbody tr:hover td,
+table:has(#tMovs) tbody tr:hover td {
+  background: rgba(0,0,0,0.06) !important;
+}
+
+/* Destaque um pouco mais forte na célula específica sob o mouse */
+table:has(#tEstado) tbody td:hover,
+table:has(#tMovs) tbody td:hover {
+  background: rgba(0,0,0,0.10) !important;
+}
+
+
+/* ==== Espaço + Hover visível com sombra não-preta ==== */
+/* Espaço reforçado entre o título e a tabela do Estado Atual */
+#secEstadoAtual .section-title { margin-bottom: 2rem !important; }
+
+/* Sombra colorida (azul) em vez de preta para cards */
+.card { box-shadow: 0 2px 6px rgba(0, 123, 255, 0.18) !important; }
+.card:hover { box-shadow: 0 8px 20px rgba(0, 123, 255, 0.28) !important; transform: translateY(-2px); }
+
+/* Linhas das tabelas com drop-shadow azul (não preto) */
+#tEstado tr, #tMovs tr { filter: drop-shadow(0 2px 6px rgba(0, 123, 255, 0.18)) !important; }
+#tEstado tr:hover, #tMovs tr:hover { filter: drop-shadow(0 8px 18px rgba(0, 123, 255, 0.28)) !important; }
+
+/* Hover MUITO visível nas células: azul clarinho */
+#tEstado tbody tr:hover td, #tMovs tbody tr:hover td { background: #eaf4ff !important; }
+#tEstado tbody td:hover, #tMovs tbody td:hover { background: #d9ecff !important; }
+
+
+/* ==== Efeitos nos títulos dos cards ==== */
+.section-title {
+  position: relative;
+  text-align: center;
+}
+.section-title::after {
+  content: "";
+  display: block;
+  height: 3px;
+  width: 64px;
+  margin: .4rem auto 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #66b2ff, #a88bff);
+  transform: scaleX(0.9);
+  transition: transform .2s ease-in-out, opacity .2s ease-in-out;
+  opacity: .85;
+}
+.section-title:hover::after {
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+/* ==== Título do site (header) com estilo diferenciado ==== */
+header.topbar h1 {
+  font-size: 2.15rem;
+  font-weight: 800;
+  letter-spacing: .5px;
+  margin: 0;
+  background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 2px 12px rgba(58,123,213,.25);
+}
+
+/* Layout da barra topo + filtros na mesma linha */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+section.filtros .field { margin-right: .5rem; }
+section.filtros .top-actions {
+  margin-left: auto; /* empurra pro fim da linha */
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+section.filtros .top-actions .limite {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+}
+section.filtros .top-actions label { white-space: nowrap; }
+section.filtros .top-actions #limiteBaixa { width: 5rem; }
+
+
+/* ==== Centralizar o nome do produto nos cards ==== */
+#listaProdutos .card .card-header > div:first-child { flex: 1 1 auto; }
+#listaProdutos .card .card-header .title {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-weight: 700;
+}
+
+
+/* ==== Linha de filtros com ações no final ==== */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+section.filtros .field { margin-right: .5rem; }
+section.filtros #aplicarFiltros { margin-right: .5rem; }
+section.filtros .top-actions { margin-left: auto; display: flex; align-items: center; gap: .75rem; }
+section.filtros .top-actions .limite { display: inline-flex; align-items: center; gap: .4rem; }
+section.filtros .top-actions #limiteBaixa { width: 5rem; }
+
+/* ==== Nome do produto centralizado e com destaque ==== */
+#listaProdutos .card .card-header > div:first-child { flex: 1 1 auto; }
+#listaProdutos .card .title {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-weight: 800;
+  font-size: 1.2rem;
+  position: relative;
+}
+#listaProdutos .card .title::after {
+  content: "";
+  display: block;
+  height: 2px;
+  width: 48px;
+  margin: .25rem auto 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #66b2ff, #a88bff);
+  opacity: .9;
+}
+
+
+/* ==== Centralizar o título do site ==== */
+header.topbar, header {
+  display: block;
+}
+header.topbar h1, header h1 {
+  text-align: center !important;
+  margin: 0.5rem 0 0.5rem;
+}
+
+/* ==== Filtros: ações ao lado do Aplicar ==== */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+section.filtros .field { margin-right: .25rem; }
+section.filtros #aplicarFiltros { margin-right: .25rem; }
+section.filtros .top-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  margin-left: 0; /* colado ao Aplicar */
+}
+section.filtros .top-actions .limite { display: inline-flex; align-items: center; gap: .4rem; }
+section.filtros .top-actions #limiteBaixa { width: 4.5rem; }
+
+
+/* ==== Botão + Novo Produto em verde com ícone ==== */
+#abrirNovoProduto.btn.success {
+  background: #2e7d32 !important;   /* green 800 */
+  border-color: #2e7d32 !important;
+  color: #ffffff !important;
+}
+#abrirNovoProduto.btn.success:hover {
+  background: #1b5e20 !important;   /* green 900 */
+  box-shadow: 0 6px 16px rgba(46,125,50,0.35);
+  transform: translateY(-1px);
+}
+
+/* ==== Tabelas sem sombra (sombra transparente) ==== */
+#tEstado tr, #tMovs tr { 
+  filter: none !important;                 /* remove drop-shadow */
+  box-shadow: none !important;             /* caso exista box-shadow antigo */
+}
+/* Mantém hover visível apenas pela cor de fundo, não por sombra */
+#tEstado tbody tr:hover td, #tMovs tbody tr:hover td { 
+  background: #eaf4ff !important;          /* azul clarinho do hover */
+}
+#tEstado tbody td:hover, #tMovs tbody td:hover {
+  background: #d9ecff !important;
+}
+
+
+/* ==== Ícone ➕ mais visível no botão verde ==== */
+#abrirNovoProduto.btn.success {
+  background: #2e7d32 !important;
+  border-color: #2e7d32 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+#abrirNovoProduto.btn.success .icon {
+  font-size: 1.35em;
+  margin-right: .4rem;
+  line-height: 1;
+  vertical-align: -2px;
+  color: #ffffff;
+  -webkit-text-stroke: 0.6px rgba(0,0,0,0.35);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+}
+#abrirNovoProduto.btn.success:hover {
+  background: #1b5e20 !important;
+  box-shadow: 0 6px 16px rgba(46,125,50,0.35);
+  transform: translateY(-1px);
+}
+
+
+/* ==== Mesmo efeito do '+ Novo Produto' para Salvar e Aplicar ==== */
+#salvarLimite.btn, #aplicarFiltros.btn {
+  background: #1976d2 !important;   /* azul primário */
+  border-color: #1976d2 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  transition: transform .2s ease-in-out, box-shadow .2s ease-in-out;
+}
+#salvarLimite.btn:hover, #aplicarFiltros.btn:hover {
+  background: #0d47a1 !important;   /* hover mais escuro */
+  box-shadow: 0 6px 16px rgba(25,118,210,0.35);
+  transform: translateY(-1px);
+}
+
+
+/* ==== Input menor para 'Limite de estoque baixo' ==== */
+#limiteBaixa {
+  width: 3.25rem !important;   /* ~52px */
+  height: 1.9rem !important;
+  font-size: .9rem !important;
+  padding: .2rem .35rem !important;
+  text-align: center !important;
+}
+
+
+/* ==== 'Nome do produto' em fundo branco ==== */
+#buscar { background: #ffffff !important; color: #000000 !important; border: 1px solid #d0d7de !important; border-radius: 8px !important; padding: .45rem .6rem !important; height: 2.1rem; box-shadow: none !important; }
+#buscar::placeholder { color: #6b7280; }
+/* Remover bg do autofill que pode amarelar no Chrome */
+#buscar:-webkit-autofill { -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important; -webkit-text-fill-color: #000000 !important; }
+
+
+/* ==== Ajuste: largura e borda do campo de busca (#buscar) ==== */
+#buscar {
+  width: 20rem !important;   /* ~320px */
+  max-width: 100% !important;
+  border-radius: 12px !important;
+}
+
+
+/* ==== #buscar menor e mais harmonioso ==== */
+#buscar {
+  width: 16rem !important;   /* ~256px */
+  max-width: 100% !important;
+  height: 1.9rem !important;
+  padding: .3rem .55rem !important;
+  border-radius: 10px !important;
+  font-size: .95rem !important;
+  border: 1px solid #d0d7de !important;
+}
+#buscar::placeholder {
+  color: #8893a0;
+}
+#buscar:focus {
+  outline: 0;
+  border-color: #90caf9 !important;
+  box-shadow: 0 0 0 3px rgba(25,118,210,0.15);
+}
+
+
+/* ==== Alinhar altura do #buscar com os botões (na linha de filtros) ==== */
+section.filtros #buscar {
+  height: 32px !important;         /* igual à altura típica do .btn (8px + 16px + 8px) */
+  padding: 0 10px !important;       /* padding horizontal; sem padding vertical para bater a altura */
+  box-sizing: border-box !important;
+  border-radius: 10px !important;
+  font-size: .95rem !important;
+}
+
+
+/* ==== Alinhar altura do input #limiteBaixa com os botões ==== */
+section.filtros #limiteBaixa {
+  height: 32px !important;
+  padding: 0 8px !important;
+  box-sizing: border-box !important;
+  border-radius: 10px !important;
+  font-size: .95rem !important;
+  vertical-align: middle !important;
+}
+
+
+/* ==== Unificar tamanho de fonte: buscar, limite e botões ==== */
+section.filtros #buscar,
+section.filtros #limiteBaixa,
+section.filtros .btn {
+  font-size: .95rem !important;
+  font-family: inherit !important;
+}
+
+
+/* ==== Espaço maior entre o título e a barra de filtros ==== */
+section.filtros {
+  margin-top: 2.25rem !important; /* antes de ~0, agora com respiro maior */
+}
+
+
+/* ==== Espaço AINDA maior entre o título e a barra de filtros ==== */
+section.filtros { margin-top: 3rem !important; }
+
+
+/* ==== Espaço maior (4.5rem) entre o título e a barra de filtros ==== */
+section.filtros { margin-top: 4.5rem !important; }
+
+
+/* ==== Underline ocupa exatamente a largura do texto ==== */
+/* Títulos das seções (ex.: 🛒 Produtos) */
+.section-title {
+  display: block !important;
+  width: -moz-fit-content !important;
+  width: fit-content !important;   /* contrai para o texto */
+  margin-left: auto !important;
+  margin-right: auto !important;   /* centraliza o bloco */
+}
+.section-title::after {
+  width: 100% !important;          /* linha acompanha 100% do texto */
+}
+
+/* Nome do produto dentro do card */
+#listaProdutos .card .card-header > div:first-child { text-align: center !important; }
+#listaProdutos .card .title {
+  display: inline-block !important; /* contrai para o texto */
+  width: auto !important;
+}
+#listaProdutos .card .title::after {
+  width: 100% !important;          /* linha acompanha 100% do nome */
+}
+
+
+/* ==== Barra de filtros no estilo da imagem ==== */
+
+/* Linha de filtros com itens lado a lado */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+/* Input de busca já está branco — mantemos */
+
+/* Select "Quantidade" como pill branco com caret */
+section.filtros select#ordenarPor {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background: #ffffff no-repeat right 12px center;
+  color: #111827;
+  border: 1px solid #d0d7de;
+  border-radius: 12px;
+  height: 32px;
+  padding: 0 36px 0 12px;
+  box-shadow: 0 6px 18px rgba(25,118,210,0.15);
+  position: relative;
+}
+/* caret via background SVG */
+section.filtros select#ordenarPor {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2321273B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+}
+
+/* Botão Aplicar com leve glow para combinar */
+section.filtros #aplicarFiltros.btn {
+  box-shadow: 0 6px 16px rgba(25,118,210,0.28);
+}
+
+/* Grupo à direita com fundo escuro arredondado (Limite + Salvar + Novo) */
+section.filtros .top-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  background: rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: .5rem .75rem;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07);
+}
+section.filtros .top-actions .limite {
+  display: inline-flex; align-items: center; gap: .4rem;
+}
+section.filtros #limiteBaixa {
+  background: #ffffff; color: #111827;
+  border: 1px solid #d0d7de; border-radius: 10px;
+  height: 32px; padding: 0 8px; width: 3.25rem;
+}
+
+/* Botão Salvar (azul) e Novo (verde) já com efeitos; manter alinhados */
+section.filtros #salvarLimite.btn { box-shadow: 0 6px 16px rgba(25,118,210,0.28); }
+section.filtros #abrirNovoProduto.btn.success { box-shadow: 0 6px 16px rgba(46,125,50,0.28); }
+
+/* ➕ roxo para contrastar com o verde */
+#abrirNovoProduto.btn.success .icon {
+  color: #b388ff;
+  -webkit-text-stroke: 0.6px rgba(0,0,0,0.35);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+}
+
+
+/* ==== 'Aplicar' ao lado do campo de busca + reduzir a caixinha ==== */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+/* Ordem desejada: Buscar (1) -> Aplicar (2) -> Select (3) -> Ações (4) */
+section.filtros #buscar { order: 1; width: 14rem !important; max-width: 100% !important; }
+section.filtros #aplicarFiltros { order: 2; margin-left: 0 !important; }
+section.filtros select#ordenarPor { order: 3; }
+section.filtros .top-actions { order: 4; margin-left: auto; }
+
+
+/* ==== Ordem desejada na barra de filtros ==== */
+/* Buscar -> Aplicar -> Quantidade -> (Limite/Salvar/➕ Novo) */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+section.filtros #buscar { order: 1; }
+section.filtros #aplicarFiltros { order: 2; margin-left: 0 !important; }
+section.filtros select#ordenarPor { order: 3; }
+section.filtros .top-actions { order: 4; margin-left: 0 !important; }
+
+
+/* ==== Forçar 'Aplicar' entre a caixinha de busca e o filtro de quantidade ==== */
+section.filtros { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+/* Identifica os wrappers .field pelo conteúdo e aplica a ordem */
+section.filtros .field:has(#buscar)       { order: 1; }
+section.filtros #aplicarFiltros           { order: 2; margin-left: 0 !important; }
+section.filtros .field:has(#ordenarPor)   { order: 3; }
+section.filtros .top-actions              { order: 4; margin-left: 0 !important; }
+/* Mantém a caixinha de busca menor e harmoniosa */
+section.filtros .field:has(#buscar) #buscar { width: 14rem !important; }
+
+
+/* ==== Harmonia da barra de filtros: tamanhos, disposição e efeitos uniformes ==== */
+/* Ordem: Buscar -> Aplicar -> Quantidade -> (Limite/Salvar/➕ Novo) */
+section.filtros { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+section.filtros .field:has(#buscar)     { order:1; }
+section.filtros #aplicarFiltros         { order:2; margin-left:0 !important; }
+section.filtros .field:has(#ordenarPor) { order:3; }
+section.filtros .top-actions            { order:4; margin-left:0 !important; }
+
+/* Alturas e bordas uniformes */
+section.filtros #buscar,
+section.filtros select#ordenarPor,
+section.filtros #limiteBaixa,
+section.filtros .btn {
+  height: 34px !important;
+  border-radius: 14px !important;
+}
+
+/* Larguras e paddings equilibrados */
+section.filtros #buscar {
+  width: 12.5rem !important; /* menor e mais equilibrado */
+  max-width: 100% !important;
+  padding: 0 10px !important;
+  box-sizing: border-box !important;
+}
+section.filtros select#ordenarPor {
+  min-width: 9.5rem !important;
+  padding: 0 36px 0 12px !important;
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background: #ffffff no-repeat right 12px center;
+  border: 1px solid #d0d7de;
+  box-shadow: 0 4px 12px rgba(25,118,210,0.15);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2321273B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+}
+section.filtros #limiteBaixa {
+  width: 3.1rem !important;
+  padding: 0 8px !important;
+  text-align: center !important;
+  border: 1px solid #d0d7de;
+  background: #ffffff;
+}
+
+/* Grupo à direita bem próximo do select e com tamanho contido */
+section.filtros .top-actions {
+  display: inline-flex; align-items:center; gap:.5rem;
+  padding: .4rem .6rem;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.06);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07);
+}
+
+/* Efeitos uniformes (transição/elevação) para todos os controles */
+section.filtros .btn,
+section.filtros select#ordenarPor,
+section.filtros #buscar,
+section.filtros #limiteBaixa {
+  transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease, background-color .2s ease;
+}
+section.filtros .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+}
+section.filtros select#ordenarPor:focus,
+section.filtros #buscar:focus,
+section.filtros #limiteBaixa:focus {
+  outline: 0;
+  border-color: #90caf9;
+  box-shadow: 0 0 0 3px rgba(25,118,210,0.15);
+}
+
+
+/* ==== Colocar 'Aplicar' entre a busca e o filtro de Quantidade ==== */
+section.filtros { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+section.filtros .field:has(#buscar)   { order:1; }
+section.filtros #aplicarFiltros       { order:2; margin:0 !important; }
+section.filtros .field:has(#ordenarPor){ order:3; }
+section.filtros .top-actions          { order:4; margin:0 !important; display:flex; align-items:center; gap:.5rem; }
+
+/* ==== Em .top-actions, deixar Salvar e +Novo coladinhos ao lado do select ==== */
+section.filtros .top-actions .limite { order:1; }
+section.filtros .top-actions #salvarLimite { order:2; }
+section.filtros .top-actions #abrirNovoProduto { order:3; }  /* bloco 'Limite de estoque baixo: [ ]' vai por último */
+
+/* Alturas e bordas iguais para harmonizar */
+section.filtros #aplicarFiltros,
+section.filtros #abrirNovoProduto,
+section.filtros #salvarLimite,
+section.filtros #buscar,
+section.filtros #limiteBaixa,
+section.filtros #ordenarPor {
+  height: 34px !important;
+  border-radius: 14px !important;
+}
+
+/* ==== Reduzir as 'caixinhas' de formulários (nome, quantidade, data da compra etc) fora da barra de filtros ==== */
+body :not(section.filtros) input[type="text"],
+body :not(section.filtros) input[type="number"],
+body :not(section.filtros) input[type="date"],
+body :not(section.filtros) select {
+  height: 32px;
+  border-radius: 10px;
+  padding: 0 .5rem;
+  max-width: 14rem;        /* menor e consistente */
+  box-sizing: border-box;
+}
+
+
+/* ==== Filtros logo abaixo de 'Produtos', alinhado à esquerda ==== */
+section.filtros {
+  justify-content: flex-start !important;
+  margin-top: 2.2rem !important; /* ~duas linhas */
+}
+
+
+/* ==== Centralização perfeita dentro das "bolinhas" (pill buttons) ==== */
+section.filtros #aplicarFiltros.btn,
+section.filtros #salvarLimite.btn,
+section.filtros #abrirNovoProduto.btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: .4rem;
+  height: 36px !important;        /* altura um pouco maior para centralizar melhor */
+  padding: 0 14px !important;      /* sem padding vertical; centraliza no eixo Y */
+  line-height: 1 !important;
+  border-radius: 999px !important; /* "bolinha" / pill perfeita */
+  vertical-align: middle !important;
+}
+
+/* Ajuste fino do ícone ➕ dentro do botão verde */
+#abrirNovoProduto.btn .icon {
+  display: inline-block;
+  line-height: 1;
+  margin-right: .35rem;
+  transform: translateY(0);        /* zera qualquer deslocamento */
+}
+
+
+/* ==== Filtros sob 'Produtos' e antes dos cards ==== */
+section.filtros {
+  justify-content: flex-start !important;
+  margin-top: 1.25rem !important;
+  margin-bottom: 1rem !important;
+}
+
+
+/* ==== Centralizar os nomes 'Buscar' e 'Filtrar' acima das caixinhas ==== */
+section.filtros .field label[for="buscar"],
+section.filtros .field label[for="ordenarPor"] {
+  display: block;
+  width: 100%;
+  text-align: center !important;
+  margin-bottom: .3rem;
+}
+
+
+/* ==== Igualar as duas caixinhas: Buscar e Filtrar ==== */
+section.filtros #buscar,
+section.filtros select#ordenarPor {
+  height: 36px !important;
+  border-radius: 14px !important;
+  box-sizing: border-box !important;
+  font-size: .95rem !important;
+}
+/* Padding específico para cada controle */
+section.filtros #buscar {
+  padding: 0 12px !important;
+  background-color: #ffffff !important;
+  border: 1px solid #d0d7de !important;
+}
+section.filtros select#ordenarPor {
+  padding: 0 36px 0 12px !important; /* preserva espaço da setinha */
+  border: 1px solid #d0d7de !important;
+}
+
+
+/* ==== Título '📦 Controle de Estoque' com mais efeito e enfoque ==== */
+header.topbar h1, header h1 {
+  position: relative;
+  text-align: center !important;
+  margin: 0.5rem 0 0.75rem;
+  font-weight: 900;
+  letter-spacing: .4px;
+  background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 3px 18px rgba(58,123,213,.35);
+}
+/* Barra sutil abaixo do título com animação de foco */
+header.topbar h1::after, header h1::after {
+  content: "";
+  display: block;
+  height: 4px;
+  width: 84px;
+  margin: .5rem auto 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(0,210,255,.9), rgba(58,123,213,.9));
+  box-shadow: 0 6px 22px rgba(58,123,213,.25);
+  transform: scaleX(.9);
+  transition: transform .25s ease, opacity .25s ease;
+  opacity: .9;
+}
+header.topbar h1:hover::after, header h1:hover::after {
+  transform: scaleX(1);
+  opacity: 1;
+}
+/* Brilho discreto que percorre o título ao focar/hover */
+@keyframes title-shine { 
+  0% { background-position: -200% 0; } 
+  100% { background-position: 200% 0; } 
+}
+header.topbar h1:hover, header h1:hover {
+  background-image: linear-gradient(90deg, #00d2ff, #3a7bd5, #00d2ff);
+  background-size: 200% auto;
+  animation: title-shine 1.2s linear 1;
+}
+
+/* ==== Filtros: todos na MESMA linha das caixinhas brancas ==== */
+/* Ordem: Buscar -> Aplicar -> Filtrar (Quantidade) -> [Limite / 5 / Salvar / ➕ Novo] */
+section.filtros {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: nowrap;                 /* força em uma linha (desktop) */
+}
+@media (max-width: 900px) {
+  section.filtros { flex-wrap: wrap; }  /* responsivo: pode quebrar */
+}
+section.filtros .field:has(#buscar)     { order: 1; }
+section.filtros #aplicarFiltros         { order: 2; }
+section.filtros .field:has(#ordenarPor) { order: 3; }
+section.filtros .top-actions            { order: 4; margin-left: 0 !important; display: inline-flex; align-items: center; gap: .5rem; }
+
+/* Alturas, raios e tipografia iguais para todos */
+section.filtros #buscar,
+section.filtros select#ordenarPor,
+section.filtros #limiteBaixa,
+section.filtros .btn {
+  height: 36px !important;
+  border-radius: 14px !important;
+  font-size: .95rem !important;
+}
+
+/* Geometrias e paddings */
+section.filtros #buscar {
+  background: #fff; border: 1px solid #d0d7de;
+  padding: 0 12px; width: 12.5rem; max-width: 100%;
+}
+section.filtros select#ordenarPor {
+  min-width: 10.5rem;
+  padding: 0 36px 0 12px;
+  -webkit-appearance:none; -moz-appearance:none; appearance:none;
+  background: #fff no-repeat right 12px center;
+  border: 1px solid #d0d7de;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2321273B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+}
+section.filtros #limiteBaixa {
+  width: 3.1rem; padding: 0 8px; text-align: center;
+  background: #fff; border: 1px solid #d0d7de;
+}
+
+/* Centralização perfeita nas "bolinhas" dos botões */
+section.filtros #aplicarFiltros.btn,
+section.filtros #salvarLimite.btn,
+section.filtros #abrirNovoProduto.btn {
+  display:inline-flex; align-items:center; justify-content:center;
+  padding: 0 14px; line-height:1; border-radius:999px !important;
+}
+
+
+/* ==== Aplicar + (Limite / Salvar / ➕) na MESMA linha das caixinhas brancas ==== */
+section.filtros {
+  display: flex;
+  flex-wrap: nowrap;            /* tudo numa linha (desktop) */
+  align-items: flex-end;        /* alinha pela base das caixinhas */
+  gap: .6rem;
+}
+@media (max-width: 900px) {
+  section.filtros { flex-wrap: wrap; } /* responsivo, pode quebrar em telas pequenas */
+}
+
+/* Fields com label em cima e caixa embaixo */
+section.filtros .field {
+  display: flex;
+  flex-direction: column;
+}
+section.filtros .field label {
+  margin-bottom: .3rem;
+}
+
+/* Botões e grupo da direita alinhados à base dos campos */
+section.filtros #aplicarFiltros,
+section.filtros .top-actions {
+  align-self: flex-end;
+  margin-top: 0 !important;
+}
+
+/* Ordem: Buscar -> Aplicar -> Filtrar -> Grupo Direita */
+section.filtros .field:has(#buscar)     { order: 1; }
+section.filtros #aplicarFiltros         { order: 2; }
+section.filtros .field:has(#ordenarPor) { order: 3; }
+section.filtros .top-actions            { order: 4; }
+
+
+/* ==== Filtros: SEM QUEBRA (sempre uma linha) ==== */
+section.filtros {
+  display: flex;
+  flex-wrap: nowrap !important;   /* nunca quebrar */
+  align-items: flex-end;          /* alinha pela base dos campos */
+  gap: .6rem;
+  overflow-x: auto;               /* caso não caiba, scroll horizontal */
+  -webkit-overflow-scrolling: touch;
+}
+
+
+/* ==== Tudo na MESMA linha: Buscar | Aplicar | Filtrar | Limite / 5 / Salvar / ➕ ==== */
+section.filtros {
+  display: flex !important;
+  align-items: flex-end !important;  /* alinha pela base (labels acima, caixas abaixo) */
+  flex-wrap: nowrap !important;      /* nunca quebrar de linha */
+  gap: .6rem !important;
+  overflow-x: auto;                  /* se não couber, scroll horizontal */
+  -webkit-overflow-scrolling: touch;
+}
+/* Cada bloco não deve quebrar */
+section.filtros .field,
+section.filtros #aplicarFiltros,
+section.filtros .top-actions {
+  flex: 0 0 auto !important;        /* não encolher a ponto de quebrar */
+  white-space: nowrap !important;
+}
+
+/* Grupo da direita SEM quebra interna */
+section.filtros .top-actions {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: .5rem !important;
+  margin-left: 0 !important;
+}
+section.filtros .top-actions .limite {
+  display: flex !important;
+  align-items: center !important;
+  gap: .4rem !important;
+  white-space: nowrap !important;
+}
+section.filtros .top-actions .limite label {
+  display: inline-block !important;
+  margin: 0 !important;
+}
+/* Evita qualquer <br> acidental afetar layout (apenas segurança) */
+section.filtros .top-actions br { display: none !important; }
+
+
+/* ==== Select auto-ajustado ao texto + direcionais ▲ ▼ ==== */
+section.filtros .field:has(#ordenarPor) { position: relative; }
+
+section.filtros select#ordenarPor {
+  width: auto !important;        /* ajusta à largura do texto */
+  min-width: 0 !important;
+  padding-right: 42px !important;/* espaço para ▲ ▼ */
+  background-image: none !important; /* removemos a setinha extra para não poluir */
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+}
+
+section.filtros .dir-arrows {
+  position: absolute;
+  right: 8px;
+  top: calc(50% - 16px);
+  width: 26px;
+  height: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: auto;
+}
+
+section.filtros .dir-arrows .dir-up,
+section.filtros .dir-arrows .dir-down {
+  width: 100%;
+  height: 14px;
+  line-height: 14px;
+  font-size: 11px;
+  background: transparent;
+  color: #374151;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color .15s ease;
+}
+section.filtros .dir-arrows .dir-up:hover,
+section.filtros .dir-arrows .dir-down:hover {
+  background-color: rgba(0,0,0,0.06);
+}
+section.filtros .dir-arrows .active {
+  background-color: rgba(25,118,210,0.15);
+}
+
+/* Mantém tudo numa linha (já aplicado antes), reforço aqui */
+section.filtros { flex-wrap: nowrap !important; }
+
+
+/* ==== Botões 'Cancelar' com fundo vermelho ==== */
+#fecharModalProduto.btn,
+#fecharModalAcoes.btn,
+.btn.cancel {
+  background: #c62828 !important;   /* red 800 */
+  border-color: #c62828 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 14px;
+  line-height: 1;
+  border-radius: 999px; /* pill */
+  transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease;
+}
+#fecharModalProduto.btn:hover,
+#fecharModalAcoes.btn:hover,
+.btn.cancel:hover {
+  background: #b71c1c !important;   /* darker red */
+  box-shadow: 0 8px 20px rgba(198,40,40,0.35);
+  transform: translateY(-1px);
+}
+
+
+/* ==== Top-actions alinhado exatamente à altura da caixinha de 'Filtrar' ==== */
+section.filtros { align-items: flex-end !important; flex-wrap: nowrap !important; }
+
+/* Seletores e inputs com altura padronizada */
+section.filtros #buscar,
+section.filtros select#ordenarPor,
+section.filtros #limiteBaixa,
+section.filtros .btn {
+  height: 36px !important;
+}
+
+/* Grupo da direita no MESMO nível da caixa de 'Filtrar' */
+section.filtros .top-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  height: 36px !important;
+  gap: .5rem !important;
+  white-space: nowrap !important;
+  padding: 0 .6rem !important;
+  margin: 0 !important;
+  align-self: flex-end !important;      /* alinha pela base das caixas */
+}
+
+/* Subgrupo 'Limite' sem quebrar e centrado verticalmente */
+section.filtros .top-actions .limite {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: .4rem !important;
+  height: 36px !important;
+  white-space: nowrap !important;
+  margin: 0 !important;
+}
+
+/* Evitar quebras internas e <br> acidentais */
+section.filtros .top-actions br { display: none !important; }
+
+
+/* ==== Filtrar com setas internas (estilo spinner) como 'Limite' ==== */
+section.filtros .field:has(#ordenarPor) { position: relative; }
+
+/* Select: caixa branca padrão */
+section.filtros select#ordenarPor {
+  background-color: #ffffff !important;
+  border: 1px solid #d0d7de !important;
+  border-radius: 14px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  padding: 0 42px 0 12px !important; /* espaço para setas */
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background-image: none !important;  /* sem caret extra */
+}
+
+/* Container das setas acoplado ao lado direito do select */
+section.filtros .dir-arrows {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 32px;
+  height: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid #d0d7de;
+  background: #ffffff;
+  border-top-right-radius: 14px;
+  border-bottom-right-radius: 14px;
+  overflow: hidden; /* bordas arredondadas */
+}
+
+/* Botões das setas */
+section.filtros .dir-arrows .dir-up,
+section.filtros .dir-arrows .dir-down {
+  width: 100%;
+  height: 18px;
+  line-height: 18px;
+  font-size: 11px;
+  background: transparent;
+  color: #374151;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+section.filtros .dir-arrows .dir-up:hover,
+section.filtros .dir-arrows .dir-down:hover {
+  background-color: rgba(0,0,0,0.06);
+}
+section.filtros .dir-arrows .active {
+  background-color: rgba(25,118,210,0.15);
+}
+
+/* Garantir que nada quebre a linha dos filtros */
+section.filtros { flex-wrap: nowrap !important; }
+
+
+/* ==== Select 'Filtrar' como caixinha seletora que ajusta à opção atual ==== */
+section.filtros .field:has(#ordenarPor) { position: relative; }
+
+section.filtros select#ordenarPor {
+  background-color: #ffffff !important;
+  border: 1px solid #d0d7de !important;
+  border-radius: 14px !important;
+  height: 36px !important;
+  padding: 0 28px 0 12px !important; /* espaço para caret */
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background: #ffffff no-repeat right 10px center;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2321273B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  width: auto !important;      /* deixa o JS definir com precisão */
+  min-width: unset !important;
+}
+
+/* Segurança: esconda qualquer resto de .dir-arrows */
+section.filtros .dir-arrows { display: none !important; }
+
+
+/* ==== Filtrar: seletor com direcionais internos (igual ao 'Limite') e auto-ajuste ==== */
+section.filtros .field:has(#ordenarPor) { position: relative; }
+
+section.filtros select#ordenarPor {
+  background-color: #ffffff !important;
+  border: 1px solid #d0d7de !important;
+  border-radius: 14px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  padding: 0 42px 0 12px !important; /* espaço reservado para as setas */
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background-image: none !important;  /* sem caret extra */
+  width: auto !important;             /* JS define o width */
+  min-width: unset !important;
+}
+
+/* Container das setas (área direita do select) */
+section.filtros .dir-arrows {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 32px;
+  height: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid #d0d7de;
+  background: #ffffff;
+  border-top-right-radius: 14px;
+  border-bottom-right-radius: 14px;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+/* Botões ▲ ▼ */
+section.filtros .dir-arrows .dir-up,
+section.filtros .dir-arrows .dir-down {
+  width: 100%;
+  height: 18px;
+  line-height: 18px;
+  font-size: 11px;
+  background: transparent;
+  color: #374151;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+section.filtros .dir-arrows .dir-up:hover,
+section.filtros .dir-arrows .dir-down:hover {
+  background-color: rgba(0,0,0,0.06);
+}
+section.filtros .dir-arrows .active { background-color: rgba(25,118,210,0.15); }
+
+/* Garantir uma única linha */
+section.filtros { flex-wrap: nowrap !important; }
+
+
+/* ==== FIX: select 'Filtrar' auto-ajustável (com setas) ==== */
+section.filtros .field:has(#ordenarPor) { position: relative !important; white-space: nowrap !important; }
+section.filtros .field:has(#ordenarPor) * { white-space: nowrap !important; }
+
+section.filtros select#ordenarPor {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  display: inline-block !important;
+  box-sizing: content-box !important;
+  padding-right: 42px !important;  /* espaço para ▲▼ */
+  background-image: none !important;
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+  flex: 0 0 auto !important;
+}
+
+/* Área das setas mantém posição absoluta à direita */
+section.filtros .field:has(#ordenarPor) .dir-arrows {
+  position: absolute !important;
+  top: 0; right: 0;
+  width: 32px; height: 36px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  border-left: 1px solid #d0d7de;
+  background: #ffffff;
+  border-top-right-radius: 14px; border-bottom-right-radius: 14px;
+  pointer-events: auto;
+}
+
+
+/* ==== Botão 'Limpar' ao lado do 'Aplicar' ==== */
+section.filtros #limparBusca.btn {
+  order: 3;
+  background: #1976d2 !important;
+  border-color: #1976d2 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 36px; padding: 0 14px; line-height: 1; border-radius: 999px;
+  transition: transform .2s ease-in-out, box-shadow .2s ease-in-out, background-color .2s ease-in-out;
+}
+section.filtros #limparBusca.btn:hover {
+  background: #0d47a1 !important;
+  box-shadow: 0 6px 16px rgba(25,118,210,0.35);
+  transform: translateY(-1px);
+}
+
+/* Ordering along the row */
+section.filtros .field:has(#buscar)     { order: 1; }
+section.filtros #aplicarFiltros         { order: 2; }
+section.filtros #limparBusca            { order: 3; }
+section.filtros .field:has(#ordenarPor) { order: 4; }
+section.filtros .top-actions            { order: 5; }
+
+
+/* ==== Botão 'Limpar' com fundo laranja ==== */
+section.filtros #limparBusca.btn {
+  background: #ef6c00 !important;   /* orange 800 */
+  border-color: #ef6c00 !important;
+  color: #ffffff !important;
+}
+section.filtros #limparBusca.btn:hover {
+  background: #e65100 !important;   /* darker orange */
+  box-shadow: 0 6px 16px rgba(239,108,0,0.35);
+}
+
+/* ==== Filtrar menor (mantendo alinhamento de altura) ==== */
+section.filtros .field:has(#ordenarPor) { position: relative !important; }
+section.filtros select#ordenarPor {
+  /* mesma altura para alinhar com os outros controles */
+  height: 36px !important;
+  line-height: 36px !important;
+  /* reduzir a largura visual: menos padding e área de setas menor */
+  padding: 0 28px 0 8px !important;    /* antes ~0 42px 0 12px */
+  font-size: 0.92rem !important;       /* ligeiramente menor */
+}
+/* Área das setas mais estreita */
+section.filtros .field:has(#ordenarPor) .dir-arrows {
+  width: 24px !important;              /* antes 32px */
+  height: 36px !important;
+}
+section.filtros .dir-arrows .dir-up,
+section.filtros .dir-arrows .dir-down {
+  height: 16px !important;
+  line-height: 16px !important;
+  font-size: 10px !important;
+}
+
+
+/* ==== Filtrar ainda menor + texto centralizado ==== */
+section.filtros .field:has(#ordenarPor) { position: relative !important; }
+
+section.filtros select#ordenarPor {
+  padding: 0 24px 0 8px !important;   /* menor ainda */
+  font-size: 0.88rem !important;
+  text-align: center !important;
+  text-align-last: center !important;  /* centra o valor selecionado no select */
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+section.filtros .field:has(#ordenarPor) .dir-arrows {
+  width: 20px !important;             /* setas mais estreitas */
+  height: 36px !important;
+}
+section.filtros .dir-arrows .dir-up,
+section.filtros .dir-arrows .dir-down {
+  height: 15px !important;
+  line-height: 15px !important;
+  font-size: 10px !important;
+}
+
+
+/* ==== Centralizar SEMPRE o número do 'Limite de estoque baixo' ==== */
+#limiteBaixa {
+  text-align: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+/* Ajustes de spinners para não deslocar o texto */
+#limiteBaixa::-webkit-outer-spin-button,
+#limiteBaixa::-webkit-inner-spin-button { margin: 0; }
+
+
+/* ==== Centralizar texto no campo 'Nome do produto' (busca) ==== */
+section.filtros #buscar {
+  text-align: center !important;
+}
+section.filtros #buscar::placeholder {
+  text-align: center;
+}
+
+
+/* ==== Forçar centralização do número no 'Limite de estoque baixo' ==== */
+section.filtros .top-actions .limite input#limiteBaixa,
+section.filtros input#limiteBaixa,
+input[type="number"]#limiteBaixa,
+#limiteBaixa {
+  text-align: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  direction: ltr !important;
+}
+#limiteBaixa::placeholder { text-align: center; }
+
+
+/* ==== Número do 'Limite de estoque baixo' sempre em negrito ==== */
+section.filtros .top-actions .limite #limiteBaixa,
+section.filtros #limiteBaixa,
+#limiteBaixa {
+  font-weight: 700 !important;
+}
+
+
+/* ==== Destaque forte para cards com Estoque Baixo ==== */
+#listaProdutos.grid .card.low-stock {
+  border: 2px solid #e53935 !important;
+  box-shadow: 0 10px 28px rgba(229,57,53,0.35), 0 0 0 2px rgba(229,57,53,0.15) inset;
+  transform: translateY(-1px);
+}
+#listaProdutos.grid .card.low-stock .badge.low {
+  background: #e53935;
+  color: #fff;
+  font-weight: 800;
+  border: 0;
+}
+#listaProdutos.grid .card.low-stock .title {
+  color: #ffebee;
+}
+#listaProdutos.grid .card.low-stock .card-header {
+  background: linear-gradient(180deg, rgba(229,57,53,0.22), rgba(229,57,53,0.08));
+  border-bottom: 1px solid rgba(229,57,53,0.25);
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+}
+@keyframes lowStockPulse {
+  0%, 100% { box-shadow: 0 10px 28px rgba(229,57,53,0.25), 0 0 0 2px rgba(229,57,53,0.10) inset; }
+  50% { box-shadow: 0 12px 34px rgba(229,57,53,0.45), 0 0 0 2px rgba(229,57,53,0.20) inset; }
+}
+#listaProdutos.grid .card.low-stock {
+  animation: lowStockPulse 2.6s ease-in-out infinite;
+}
+#listaProdutos.grid .card.low-stock .meta {
+  color: #ffd6d6;
+}
+
+
+/* ==== Ícone de alerta nos cards com estoque baixo ==== */
+#listaProdutos.grid .card { position: relative; }
+#listaProdutos.grid .card .low-flag {
+  position: absolute;
+  top: 6px; right: 6px;
+  font-size: 20px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35));
+  z-index: 2;
+}
+#listaProdutos.grid .card:not(.low-stock) .low-flag { display: none; }
+
+/* ==== 'Limite de estoque baixo:' um pouco maior ==== */
+section.filtros .top-actions .limite label {
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+}
+
+
+#listaProdutos.grid .card .low-flag { display: none !important; }
+#listaProdutos.grid .card .badge.low { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .5rem; border-radius: 999px; }
+
+
+/* === Mostrar ⚠️ dentro do nome 'Estoque baixo' === */
+#listaProdutos .badge.low::before { content: "⚠️ "; }
+
+/* Opcional: destaque visual para cards low-stock (mantém comportamento existente) */
+#listaProdutos .card.low-stock { border-color: #e53935; box-shadow: 0 8px 22px rgba(229,57,53,.28); }
+
+</style>
+
+</head>
+
+
+<body>
+  <header class="topbar">
+    <h1>📦 Controle de Estoque</h1>
+    </header>
+  <main class="container">
+    
+    <section>
+      <h2 class="section-title">🛒 Produtos</h2>
+      <section class="filtros">
+      <div class="field">
+        <label for="buscar">Buscar</label>
+        <input id="buscar" type="search" placeholder="Nome do produto..." />
+      </div>
+      <div class="field">
+        <label for="ordenarPor">Filtrar</label>
+        <select id="ordenarPor"><option value="preco" selected>Preço</option><option value="quantidade">Quantidade</option><option value="ultimaCompra">Última compra</option><option value="ultimaVenda">Última venda</option><option value="estoqueBaixo">Estoque baixo</option></select>
+        <div class="dir-arrows" aria-label="Direção da ordenação"><button type="button" class="dir-up" title="Ascendente">▲</button><button type="button" class="dir-down" title="Descendente">▼</button></div>
+      </div>
+      <button id="aplicarFiltros" class="btn">Aplicar</button>
+      <button id="limparBusca" class="btn">Limpar</button>
+        <div class="top-actions">
+          <div class="limite">
+            <label for="limiteBaixa">Limite de Estoque Baixo:</label>
+            <input id="limiteBaixa" type="number" min="0" step="1" />
+            <button id="salvarLimite" class="btn primary">Salvar</button>
+          </div>
+          <button id="abrirNovoProduto" class="btn success"><span class="icon">➕</span> Novo Produto</button>
+        </div>
+    </section>
+<div id="listaProdutos" class="grid"></div>
+      <div id="vazio" class="vazio" hidden>Nenhum produto encontrado.</div>
+    </section>
+    
+<section style="margin-top:1rem" id="secEstadoAtual">
+  <h2 class="section-title">📊 Estado Atual dos Produtos</h2>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th class="sortable" data-key="nome">Produto <span class="caret"></span></th>
+          <th class="sortable" data-key="quantidade">Quantidade <span class="caret"></span></th>
+          <th class="sortable" data-key="preco">Preço <span class="caret"></span></th>
+          <th class="sortable" data-key="valorTotal">Valor total <span class="caret"></span></th>
+          <th class="sortable" data-key="ultimaCompra">Última compra <span class="caret"></span></th>
+          <th class="sortable" data-key="ultimaVenda">Última venda <span class="caret"></span></th>
+        </tr>
+      </thead>
+      <tbody id="tEstado"></tbody>
+    </table>
+  </div>
+</section>
+<section class="historico">
+      <h2 class="section-title">📜 Histórico de Movimentações</h2>
+      <div class="toolbar"><button id="limparHistorico" class="btn danger" aria-label="Limpar histórico de movimentações">Limpar Histórico</button></div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" data-key="data">Data/Hora <span class="caret"></span></th>
+              <th class="sortable" data-key="tipo">Tipo <span class="caret"></span></th>
+              <th class="sortable" data-key="produto">Produto <span class="caret"></span></th>
+              <th class="sortable" data-key="qtd">Quantidade <span class="caret"></span></th>
+              <th class="sortable" data-key="valorUnit">Preço <span class="caret"></span></th>
+              <th class="sortable" data-key="valorTotal">Valor Total <span class="caret"></span></th>
+            </tr>
+          </thead>
+          <tbody id="tMovs"></tbody>
+          <tfoot><tr><td colspan="6" id="totalGeralMovs"></td></tr></tfoot>
+        </table>
+      </div>
+    </section>
+
+
+  </main>
+  <dialog id="modalProduto">
+    <form method="dialog" class="modal-card modal-card--elev" id="formProduto">
+      <h3 id="tituloModalProd">Novo Produto</h3>
+      <fieldset class="fieldset">
+        <legend class="legend">Preencha os campos abaixo</legend>
+        <p class="legend-sub">Dica: o <strong>Preço</strong> aceita centavos (ex.: 12,50). A <strong>Quantidade</strong> deve ser um número inteiro.</p>
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="nomeProduto">Nome <span class="hint">Ex.: Caneca Personalizada</span></label>
+            <input id="nomeProduto" type="text" required placeholder="Digite o nome do produto" />
+            <small class="help">Nome que aparecerá na listagem e no histórico de movimentações.</small>
+          </div>
+          <div class="field">
+            <label for="precoProduto">Preço (R$) <span class="hint">Ex.: 49,90</span></label>
+            <input id="precoProduto" type="number" min="0" step="0.01" required placeholder="0,00" inputmode="decimal" />
+            <small class="help">Valor unitário de venda. Pode incluir casas decimais.</small>
+          </div>
+          <div class="field">
+            <label for="qtdProduto">Quantidade <span class="hint">Ex.: 10</span></label>
+            <input id="qtdProduto" type="number" min="0" step="1" required placeholder="0" inputmode="numeric" />
+            <small class="help">Estoque inicial disponível.</small>
+          </div>
+        </div>
+      </fieldset>
+      <div class="modal-actions">
+        <button type="submit" class="btn success">Salvar</button>
+        <button type="button" class="btn" id="fecharModalProduto">Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="modalAcoes">
+    <form method="dialog" class="modal-card modal-card--elev" id="formAcoes">
+      <h3 id="tituloModalAcoes">Ações</h3><span id="tituloModalAcoesChip" class="titulo-chip"></span>
+      <fieldset class="fieldset"><legend class="legend">Detalhes da ação</legend><div id="acoesConteudo"></div></fieldset>
+      <div class="modal-actions">
+        <button type="submit" class="btn primary">Confirmar</button>
+        <button type="button" class="btn" id="fecharModalAcoes">Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" hidden></div>
+  <footer class="footer">
+    <small>Todos os direitos reservados para @Controle_de_Estoque - 2025.</small>
+  </footer>
+  <script src="./app.js"></script>
+  <script>
+  (function(){
+    function parseBRNumber(txt) {
+      if (!txt) return 0;
+      txt = txt.replace(/[^\d.,-]/g, '').trim();
+      if (txt.indexOf(',') > -1) { txt = txt.replace(/\./g, '').replace(',', '.'); }
+      var n = parseFloat(txt);
+      return isNaN(n) ? 0 : n;
+    }
+    
+    function parseBRDate(txt) {
+      if (!txt) return 0;
+      var m = txt.match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+      if (m) {
+        var d = +m[1], mo = (+m[2])-1, y = +m[3], hh = m[4]?+m[4]:0, mm = m[5]?+m[5]:0;
+        return new Date(y, mo, d, hh, mm).getTime();
+      }
+      var t = Date.parse(txt);
+      return isNaN(t) ? 0 : t;
+    }
+    
+    function sortHistorico(criterio, dir) {
+      var tbody = document.querySelector("#tMovs");
+      if (!tbody) return;
+      var rows = Array.from(tbody.querySelectorAll("tr"));
+      if (!rows.length) return;
+      var colIndex = { data:0, tipo:1, produto:2, qtd:3, valorUnit:4, valorTotal:5 }[criterio];
+      if (colIndex == null) return;
+      
+      function key(tr){
+        var td = tr.children[colIndex]; if(!td) return "";
+        var cell = td.textContent.trim();
+        if (criterio === "data") return parseBRDate(cell);
+        if (criterio === "qtd" || criterio === "valorUnit" || criterio === "valorTotal") return parseBRNumber(cell);
+        return cell.toLocaleLowerCase();
+      }
+      
+      rows.sort(function(a,b){ var ka=key(a), kb=key(b); return ka<kb?-1:ka>kb?1:0; });
+      if (dir === "desc") rows.reverse();
+      rows.forEach(function(r){ tbody.appendChild(r); });
+      
+          document.querySelectorAll("thead th.sortable").forEach(function(th){
+        th.classList.remove("active"); var c = th.querySelector(".caret"); if(c) c.textContent="";
+      });
+      var active = document.querySelector('thead th.sortable[data-key="'+criterio+'"]');
+      if (active){ active.classList.add("active"); var c = active.querySelector(".caret"); if(c) c.textContent = (dir==="desc"?"↓":"↑"); }
+    }
+    
+    document.addEventListener("DOMContentLoaded", function(){
+          sortHistorico("data", "desc");
+      
+          var current = { key: "data", dir: "desc" };
+      document.querySelectorAll("thead th.sortable").forEach(function(th){
+        th.addEventListener("click", function(){
+          var key = th.getAttribute("data-key");
+          if(!key) return;
+          if (current.key === key) current.dir = (current.dir === "asc") ? "desc" : "asc";
+          else { current.key = key; current.dir = "asc"; }
+          sortHistorico(current.key, current.dir);
+        });
+      });
+            
+      var btn = document.querySelector("#limparHistorico");
+      if (btn) {
+        btn.addEventListener("click", function(){
+          if (confirm("Tem certeza que deseja limpar o histórico de movimentações?")) {
+            var tbody = document.querySelector("#tMovs");
+            if (tbody) tbody.innerHTML = "";
+          }
+        });
+      }
+    });
+  })();
+  </script>
+</body>
+</html>
