@@ -3,6 +3,7 @@ import { Router } from "express";
 
 const router = Router();
 
+router.get("/dashboard", ProductController.dashboard);
 router.get("/", ProductController.index);
 router.get("/:id", ProductController.view);
 router.post("/", ProductController.store);
