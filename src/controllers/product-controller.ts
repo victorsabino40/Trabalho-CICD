@@ -5,7 +5,7 @@ import { sendResponse } from "@/@shared/helpers";
 export default class ProductController {
   constructor(private prismaClient: PrismaClient) {}
 
-  public async dashboard(_: Request, response: Response) {
+  public dashboard = async (_: Request, response: Response) => {
     try {
       const totalProductsResult = await this.prismaClient.$queryRaw<
         { count: number }[]
@@ -63,9 +63,9 @@ export default class ProductController {
         error: error instanceof Error ? error.message : String(error),
       });
     }
-  }
+  };
 
-  public async index(_: Request, response: Response) {
+  public index = async (_: Request, response: Response) => {
     const products = await this.prismaClient.product.findMany();
     return sendResponse({
       response,
@@ -73,9 +73,9 @@ export default class ProductController {
       message: "Products retrieved successfully",
       data: products,
     });
-  }
+  };
 
-  public async view(request: Request, response: Response) {
+  public view = async (request: Request, response: Response) => {
     const { id } = request.params;
     const product = await this.prismaClient.product.findUnique({
       where: { id: Number(id) },
@@ -95,9 +95,9 @@ export default class ProductController {
       message: "Product retrieved successfully",
       data: product,
     });
-  }
+  };
 
-  public async store(request: Request, response: Response) {
+  public store = async (request: Request, response: Response) => {
     const { name, price, quantity } = request.body;
     const status = ProductController.getProductStatus(quantity);
 
@@ -120,9 +120,9 @@ export default class ProductController {
         error: error instanceof Error ? error.message : String(error),
       });
     }
-  }
+  };
 
-  public async update(request: Request, response: Response) {
+  public update = async (request: Request, response: Response) => {
     const { id } = request.params;
     const { name, price, quantity } = request.body;
 
@@ -166,9 +166,9 @@ export default class ProductController {
         error: error instanceof Error ? error.message : String(error),
       });
     }
-  }
+  };
 
-  public async destroy(request: Request, response: Response) {
+  public destroy = async (request: Request, response: Response) => {
     const { id } = request.params;
 
     const product = await this.prismaClient.product.findUnique({
@@ -195,7 +195,7 @@ export default class ProductController {
         error: error instanceof Error ? error.message : String(error),
       });
     }
-  }
+  };
 
   private static getProductStatus(quantity: number): ProductStatus {
     return quantity > 10
