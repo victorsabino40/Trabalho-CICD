@@ -4,6 +4,66 @@ import prismaClient from "@/database";
 import { sendResponse } from "@/@shared/helpers";
 
 export default class ProductController {
+  static async dashboard(_: Request, response: Response) {
+    try {
+      const totalProductsResult = await prismaClient.$queryRaw<
+        { count: number }[]
+      >`SELECT COUNT(*) as count FROM products`;
+      const totalProducts = Number(
+        (totalProductsResult as { count: number }[])[0]?.count ?? 0
+      );
+
+      const totalItemsResult = await prismaClient.$queryRaw<
+        { total: number }[]
+      >`SELECT SUM(quantity) as total FROM products`;
+      const totalItems = Number(
+        (totalItemsResult as { total: number }[])[0]?.total ?? 0
+      );
+
+      const totalValueResult = await prismaClient.$queryRaw<
+        { value: number }[]
+      >`SELECT SUM(quantity * price) as value FROM products`;
+      const rawTotalValue = Number(
+        (totalValueResult as { value: number }[])[0]?.value ?? 0
+      );
+      const totalValue = parseFloat(rawTotalValue.toFixed(2));
+
+      const lowStockResult = await prismaClient.$queryRaw<
+        { count: number }[]
+      >`SELECT COUNT(*) as count FROM products WHERE status = 'LOW_STOCK'`;
+      const lowStock = Number(
+        (lowStockResult as { count: number }[])[0]?.count ?? 0
+      );
+
+      const outOfStockResult = await prismaClient.$queryRaw<
+        { count: number }[]
+      >`SELECT COUNT(*) as count FROM products WHERE status = 'OUT_OF_STOCK'`;
+      const outOfStock = Number(
+        (outOfStockResult as { count: number }[])[0]?.count ?? 0
+      );
+
+      return sendResponse({
+        response,
+        status_code: 200,
+        message: "Dashboard data retrieved successfully",
+        data: {
+          totalProducts,
+          totalItems,
+          totalValue,
+          lowStock,
+          outOfStock,
+        },
+      });
+    } catch (error) {
+      return sendResponse({
+        response,
+        status_code: 500,
+        message: "Error fetching dashboard data",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   static async index(_: Request, response: Response) {
     const products = await prismaClient.product.findMany();
     return sendResponse({
