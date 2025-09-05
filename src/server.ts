@@ -9,6 +9,14 @@ app.use(cors());
 
 app.use(express.json());
 
+app.get("/api/health", (_, response) => {
+  response.status(200).json({
+    status: "ok",
+    uptime: process.uptime(),
+    timestamp: new Date(),
+  });
+});
+
 app.use("/api/products", productRouter);
 
 app.listen(PORT, () => {
