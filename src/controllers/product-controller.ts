@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { type PrismaClient, ProductStatus } from "@prisma/client";
-import { sendResponse } from "@/@shared/helpers";
+import { sendResponse } from "../@shared/helpers";
 
 export default class ProductController {
   constructor(private prismaClient: PrismaClient) {}

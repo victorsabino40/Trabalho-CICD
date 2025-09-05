@@ -1,5 +1,5 @@
-import ProductController from "@/controllers/product-controller";
-import prismaClient from "@/database";
+import ProductController from "../controllers/product-controller";
+import prismaClient from "../database";
 import { Router } from "express";
 
 const router = Router();

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PrismaClient, ProductStatus } from "@prisma/client";
-import ProductController from "@/controllers/product-controller";
+import ProductController from "../controllers/product-controller";
 
 function createMockPrisma() {
   return {
