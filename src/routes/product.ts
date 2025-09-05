@@ -1,13 +1,16 @@
 import ProductController from "@/controllers/product-controller";
+import prismaClient from "@/database";
 import { Router } from "express";
 
 const router = Router();
 
-router.get("/dashboard", ProductController.dashboard);
-router.get("/", ProductController.index);
-router.get("/:id", ProductController.view);
-router.post("/", ProductController.store);
-router.patch("/:id", ProductController.update);
-router.delete("/:id", ProductController.destroy);
+const productController = new ProductController(prismaClient);
+
+router.get("/dashboard", productController.dashboard);
+router.get("/", productController.index);
+router.get("/:id", productController.view);
+router.post("/", productController.store);
+router.patch("/:id", productController.update);
+router.delete("/:id", productController.destroy);
 
 export default router;

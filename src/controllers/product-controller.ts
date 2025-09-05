@@ -1,26 +1,27 @@
 import type { Request, Response } from "express";
-import { ProductStatus } from "@prisma/client";
-import prismaClient from "@/database";
+import { type PrismaClient, ProductStatus } from "@prisma/client";
 import { sendResponse } from "@/@shared/helpers";
 
 export default class ProductController {
-  static async dashboard(_: Request, response: Response) {
+  constructor(private prismaClient: PrismaClient) {}
+
+  public async dashboard(_: Request, response: Response) {
     try {
-      const totalProductsResult = await prismaClient.$queryRaw<
+      const totalProductsResult = await this.prismaClient.$queryRaw<
         { count: number }[]
       >`SELECT COUNT(*) as count FROM products`;
       const totalProducts = Number(
         (totalProductsResult as { count: number }[])[0]?.count ?? 0
       );
 
-      const totalItemsResult = await prismaClient.$queryRaw<
+      const totalItemsResult = await this.prismaClient.$queryRaw<
         { total: number }[]
       >`SELECT SUM(quantity) as total FROM products`;
       const totalItems = Number(
         (totalItemsResult as { total: number }[])[0]?.total ?? 0
       );
 
-      const totalValueResult = await prismaClient.$queryRaw<
+      const totalValueResult = await this.prismaClient.$queryRaw<
         { value: number }[]
       >`SELECT SUM(quantity * price) as value FROM products`;
       const rawTotalValue = Number(
@@ -28,14 +29,14 @@ export default class ProductController {
       );
       const totalValue = parseFloat(rawTotalValue.toFixed(2));
 
-      const lowStockResult = await prismaClient.$queryRaw<
+      const lowStockResult = await this.prismaClient.$queryRaw<
         { count: number }[]
       >`SELECT COUNT(*) as count FROM products WHERE status = 'LOW_STOCK'`;
       const lowStock = Number(
         (lowStockResult as { count: number }[])[0]?.count ?? 0
       );
 
-      const outOfStockResult = await prismaClient.$queryRaw<
+      const outOfStockResult = await this.prismaClient.$queryRaw<
         { count: number }[]
       >`SELECT COUNT(*) as count FROM products WHERE status = 'OUT_OF_STOCK'`;
       const outOfStock = Number(
@@ -64,8 +65,8 @@ export default class ProductController {
     }
   }
 
-  static async index(_: Request, response: Response) {
-    const products = await prismaClient.product.findMany();
+  public async index(_: Request, response: Response) {
+    const products = await this.prismaClient.product.findMany();
     return sendResponse({
       response,
       status_code: 200,
@@ -74,9 +75,9 @@ export default class ProductController {
     });
   }
 
-  static async view(request: Request, response: Response) {
+  public async view(request: Request, response: Response) {
     const { id } = request.params;
-    const product = await prismaClient.product.findUnique({
+    const product = await this.prismaClient.product.findUnique({
       where: { id: Number(id) },
     });
 
@@ -96,12 +97,12 @@ export default class ProductController {
     });
   }
 
-  static async store(request: Request, response: Response) {
+  public async store(request: Request, response: Response) {
     const { name, price, quantity } = request.body;
     const status = ProductController.getProductStatus(quantity);
 
     try {
-      const product = await prismaClient.product.create({
+      const product = await this.prismaClient.product.create({
         data: { name, price, quantity, status },
       });
 
@@ -121,11 +122,11 @@ export default class ProductController {
     }
   }
 
-  static async update(request: Request, response: Response) {
+  public async update(request: Request, response: Response) {
     const { id } = request.params;
     const { name, price, quantity } = request.body;
 
-    const product = await prismaClient.product.findUnique({
+    const product = await this.prismaClient.product.findUnique({
       where: { id: Number(id) },
     });
 
@@ -146,7 +147,7 @@ export default class ProductController {
     }
 
     try {
-      const product = await prismaClient.product.update({
+      const product = await this.prismaClient.product.update({
         where: { id: Number(id) },
         data,
       });
@@ -167,10 +168,10 @@ export default class ProductController {
     }
   }
 
-  static async destroy(request: Request, response: Response) {
+  public async destroy(request: Request, response: Response) {
     const { id } = request.params;
 
-    const product = await prismaClient.product.findUnique({
+    const product = await this.prismaClient.product.findUnique({
       where: { id: Number(id) },
     });
 
@@ -183,7 +184,7 @@ export default class ProductController {
     }
 
     try {
-      await prismaClient.product.delete({ where: { id: Number(id) } });
+      await this.prismaClient.product.delete({ where: { id: Number(id) } });
 
       return sendResponse({ response, status_code: 204 });
     } catch (error) {
